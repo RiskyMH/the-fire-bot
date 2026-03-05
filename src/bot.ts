@@ -70,10 +70,10 @@ client.on(GatewayDispatchEvents.MessageCreate, async ({ data: message, api }) =>
                 break countingModule;
             }
 
-            // Respond to cheaty emoji
+            // Respond to cheaty emojis
             if (message.content?.includes('☑️') || message.content?.includes('✅')) {
                 await api.channels.addMessageReaction(message.channel_id, message.id, '🤨');
-                break countingModule;
+                // intentionally not breaking here so that it also checks the number if they reacted with the cheaty emoji
             }
 
             const num = Number.parseInt(message.content);
@@ -199,38 +199,32 @@ async function generateTimezoneMessage(guildId: string): Promise<RESTPostAPIChan
     if (!timezoneRows.length) return null;
 
     const now = Date.now();
-    const lines: string[] = [];
 
     const tzs = timezoneRows
-        .reduce((acc: ({ canonical: Timezone; user_ids: string[] })[], r) => {
+        .reduce((acc: ({ localTime: string, offsetStr: string, user_ids: string[], offsetNum: number })[], r) => {
             const canonical = getTimezones().find(e => e.name === r.timezone);
             if (!canonical) return acc;
-            const existing = acc.find(e => e.canonical.name === canonical.name);
+
+            let localTime = "?";
+            let offsetStr = "";
+            try {
+                localTime = new Intl.DateTimeFormat('en-US', { hour: 'numeric', minute: '2-digit', hour12: true, timeZone: canonical.name }).format(now);
+                offsetStr = new Intl.DateTimeFormat('en-US', { timeZone: canonical.name, timeZoneName: 'shortOffset' }).formatToParts(now).find(p => p.type === 'timeZoneName')?.value || '';
+            } catch { }
+
+            const existing = acc.find(e => e.localTime === localTime);
             if (existing) {
                 existing.user_ids.push(r.user_id);
             } else {
-                acc.push({ ...r, user_ids: [r.user_id], canonical });
+                acc.push({ ...r, user_ids: [r.user_id], localTime, offsetStr, offsetNum: canonical.offset });
             }
             return acc;
         }, [])
-        .sort((a, b) => a.canonical.offset - b.canonical.offset);
+        .sort((a, b) => a.offsetNum - b.offsetNum);
 
-
-    // sort by offset: so -10 first and 10 last
-    for (const row of tzs) {
-        const mention = row.user_ids.map(id => `<@${id}>`).join(" ");
-        let localTime = "?";
-        let offsetStr = "";
-        try {
-            localTime = new Intl.DateTimeFormat('en-US', { hour: 'numeric', minute: '2-digit', hour12: true, timeZone: row.canonical.name }).format(now);
-            offsetStr = new Intl.DateTimeFormat('en-US', { timeZone: row.canonical.name, timeZoneName: 'shortOffset' }).formatToParts(now).find(p => p.type === 'timeZoneName')?.value || '';
-        } catch { }
-        lines.push(`* \`${localTime}\`  ${offsetStr}  •  ${mention}`);
-    }
-
-    // lines.sort();
+    const lines = tzs.map(row => `* \`${row.localTime}\`  ${row.offsetStr}  •  ${row.user_ids.map(id => `<@${id}>`).join(" ")}`);
     const withHowTo = commandIds["timezone"] ? `\n-# Use </timezone set:${commandIds["timezone"]}> to set your own timezone!` : "";
-    const result = `### <a:fire_anim:1466557778071126300> Server member timezones:\n` + lines.join("\n") + withHowTo;
+    const result = `### <a:fire:1466557778071126300> Server member timezones:\n` + lines.join("\n") + withHowTo;
 
     return {
         flags: MessageFlags.IsComponentsV2,
@@ -357,7 +351,7 @@ client.on(GatewayDispatchEvents.InteractionCreate, async ({ data: interaction, a
                             content:
                                 `✅ Your timezone has been set to **${match.displayName}**` +
                                 `\n-# (Timezone abbreviation: \`${match.abbr ?? 'N/A'}\`, Offset: \`${offsetToString(match.offset)}\`${match.hasDST ? ', observes DST' : ''})`,
-                            flags: MessageFlags.Ephemeral
+                            // flags: MessageFlags.Ephemeral
                         });
                         await updateTimezoneMessage();
                     }
@@ -398,7 +392,7 @@ client.on(GatewayDispatchEvents.InteractionCreate, async ({ data: interaction, a
                         if (!result) {
                             await api.interactions.reply(interaction.id, interaction.token, {
                                 content: `ℹ️ No members in this server have set a timezone yet! Use "/timezone set" to get started.`,
-                                flags: MessageFlags.Ephemeral
+                                // flags: MessageFlags.Ephemeral
                             });
                             return;
                         }
