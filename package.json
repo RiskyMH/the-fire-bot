@@ -1,0 +1,29 @@
+{
+  "name": "the-fire-bot",
+  "module": "index.ts",
+  "type": "module",
+  "private": true,
+  "main": "src/bot.ts",
+  "scripts": {
+    "start": "bun src/bot.ts",
+    "dev": "bun --watch src/bot.ts",
+    "build:standalone": "bun build src/bot.ts --outfile dist/bot --minify --target=bun --bytecode --production --compile --format=esm --sourcemap",
+    "docker:build": "docker compose build",
+    "docker:deploy": "docker stack ls --format '{{.Name}}' | grep -q '^the-fire-bot$' && { echo 'Error: Stack exists'; false; } || { docker compose pull && docker compose up -d; }",
+    "docker:logs": "docker compose logs -f"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.3.10",
+    "typescript": "^5.9.3"
+  },
+  "dependencies": {
+    "@discordjs/core": "^2.4.0",
+    "@discordjs/rest": "^2.6.0",
+    "@discordjs/ws": "^2.0.4",
+    "@vvo/tzdb": "^6.198.0",
+    "discord-api-types": "^0.38.41"
+  },
+  "overrides": {
+    "discord-api-types": "^0.38.41"
+  }
+}
