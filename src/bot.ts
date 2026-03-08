@@ -111,7 +111,7 @@ client.on(GatewayDispatchEvents.MessageCreate, async ({ data: message, api }) =>
                 highscore: Math.max(highscore ?? 0, count + 1),
                 last_msg: nextMsg
             });
-            await api.channels.addMessageReaction(message.channel_id, message.id, highscore ?? 0 <= count + 1 ? '✅' : '☑️');
+            await api.channels.addMessageReaction(message.channel_id, message.id, (highscore ?? 0) <= (count + 1) ? '☑️' : '✅');
         }
     } catch (err) {
         console.error(`Error handling messageCreate: ${err}`);
