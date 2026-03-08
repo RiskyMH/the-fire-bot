@@ -72,7 +72,8 @@ client.on(GatewayDispatchEvents.MessageCreate, async ({ data: message, api }) =>
 
             // Respond to cheaty emojis
             if (message.content?.includes('☑️') || message.content?.includes('✅')) {
-                await api.channels.addMessageReaction(message.channel_id, message.id, '🤨');
+                // hopefully be cheaty only after the normal tick reaction is added
+                setTimeout(api.channels.addMessageReaction.bind(null, message.channel_id, message.id, '🤨'), 200);
                 // intentionally not breaking here so that it also checks the number if they reacted with the cheaty emoji
             }
 
@@ -392,13 +393,13 @@ client.on(GatewayDispatchEvents.InteractionCreate, async ({ data: interaction, a
                         if (!result) {
                             await api.interactions.reply(interaction.id, interaction.token, {
                                 content: `ℹ️ No members in this server have set a timezone yet! Use "/timezone set" to get started.`,
-                                // flags: MessageFlags.Ephemeral
+                                flags: MessageFlags.Ephemeral
                             });
                             return;
                         }
                         await api.interactions.reply(interaction.id, interaction.token, {
                             ...result,
-                            flags: (result.flags || 0) | MessageFlags.Ephemeral,
+                            // flags: (result.flags || 0) | MessageFlags.Ephemeral,
                             allowed_mentions: {},
                         });
                     }
