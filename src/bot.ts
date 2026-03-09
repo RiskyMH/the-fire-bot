@@ -202,6 +202,12 @@ async function generateTimezoneMessage(guildId: string): Promise<RESTPostAPIChan
     const now = Date.now();
 
     const tzs = timezoneRows
+        .sort((a, b) => {
+            if (a.user_id.length === b.user_id.length) {
+                return a.user_id.localeCompare(b.user_id);
+            }
+            return a.user_id.length - b.user_id.length;
+        })
         .reduce((acc: ({ localTime: string, offsetStr: string, user_ids: string[], offsetNum: number })[], r) => {
             const canonical = getTimezones().find(e => e.name === r.timezone);
             if (!canonical) return acc;
