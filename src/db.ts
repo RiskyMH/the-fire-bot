@@ -56,6 +56,14 @@ export async function initDb() {
       FOREIGN KEY (guild_id) REFERENCES config(guild_id) ON DELETE CASCADE
     );
   `;
+  await db`
+    CREATE TABLE IF NOT EXISTS member_actions (
+      guild_id TEXT PRIMARY KEY,
+      join_role_id TEXT,
+      log_channel_id TEXT,
+      FOREIGN KEY (guild_id) REFERENCES config(guild_id) ON DELETE CASCADE
+    );
+  `;
 }
 
 export async function removeGuild(guild_id: string): Promise<void> {
@@ -63,6 +71,7 @@ export async function removeGuild(guild_id: string): Promise<void> {
   await db`DELETE FROM timezone_message WHERE guild_id = ${guild_id}`;
   await db`DELETE FROM timezone_user WHERE guild_id = ${guild_id}`;
   await db`DELETE FROM counting WHERE guild_id = ${guild_id}`;
+  await db`DELETE FROM member_actions WHERE guild_id = ${guild_id}`;
 }
 
 export async function ensureConfig(guild_id: string): Promise<void> {
@@ -123,6 +132,9 @@ export async function resetCounting(channel_id: string, toCount: number = 0): Pr
   await db`UPDATE counting SET count = ${toCount}, last_msg = '{}' WHERE channel_id = ${channel_id}`;
 }
 
+export async function removeCountingByChannelId(guild_id: string, channel_id: string) {
+  await db`DELETE FROM counting WHERE channel_id = ${channel_id} AND guild_id = ${guild_id}`;
+}
 
 export async function setUserTimezone(guild_id: string, user_id: string, timezone: string): Promise<void> {
   await ensureConfig(guild_id);
@@ -166,6 +178,13 @@ export async function setGuildTimezoneMessage(guild_id: string, channel_id: stri
   `;
 }
 
+export async function removeGuildTimezoneMessageByMsgId(guild_id: string, message_id: string): Promise<void> {
+  await db`DELETE FROM timezone_message WHERE guild_id = ${guild_id} AND message_id = ${message_id}`;
+}
+export async function removeGuildTimezoneMessageByChannelId(guild_id: string, channel_id: string): Promise<void> {
+  await db`DELETE FROM timezone_message WHERE guild_id = ${guild_id} AND channel_id = ${channel_id}`;
+}
+
 export async function getGuildTimezoneMessage(guild_id: string): Promise<{ channel_id: string, message_id: string } | null> {
   const result = await db`SELECT channel_id, message_id FROM timezone_message WHERE guild_id = ${guild_id}`;
   if (result.length === 0) return null;
@@ -178,4 +197,44 @@ export async function getGuildTimezoneMessage(guild_id: string): Promise<{ chann
 export async function getTimezoneMessages(): Promise<{ channel_id: string, message_id: string, guild_id: string }[]> {
   const result = await db`SELECT channel_id, message_id, guild_id FROM timezone_message`;
   return Array.isArray(result) ? result : [];
+}
+
+export async function getGuildActions(guild_id: string): Promise<{ join_role_id: string | null, log_channel_id: string | null } | null> {
+  const result = await db`SELECT join_role_id, log_channel_id FROM member_actions WHERE guild_id = ${guild_id}`;
+  if (result.length === 0) return null;
+  return {
+    join_role_id: result[0].join_role_id,
+    log_channel_id: result[0].log_channel_id,
+  };
+}
+
+export async function setGuildActions(guild_id: string, { join_role_id, log_channel_id }: { join_role_id: string | null, log_channel_id: string | null }): Promise<void> {
+  await ensureConfig(guild_id);
+  await db`
+    INSERT INTO member_actions (guild_id, join_role_id, log_channel_id)
+    VALUES (${guild_id}, ${join_role_id}, ${log_channel_id})
+    ON CONFLICT(guild_id) DO UPDATE SET
+      join_role_id = excluded.join_role_id,
+      log_channel_id = excluded.log_channel_id;
+  `;
+}
+
+export async function removeGuildActions(guild_id: string): Promise<void> {
+  await db`DELETE FROM member_actions WHERE guild_id = ${guild_id}`;
+}
+
+export async function removeGuildActionsLogByChannelId(guild_id: string, channel_id: string): Promise<void> {
+  await db`
+    UPDATE member_actions
+    SET log_channel_id = NULL
+    WHERE guild_id = ${guild_id} AND log_channel_id = ${channel_id}
+  `;
+}
+
+export async function removeGuildActionsRoleByRoleId(guild_id: string, role_id: string): Promise<void> {
+  await db`
+    UPDATE member_actions
+    SET join_role_id = NULL
+    WHERE guild_id = ${guild_id} AND join_role_id = ${role_id}
+  `;
 }

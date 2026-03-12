@@ -2,10 +2,10 @@ import { Client } from "@discordjs/core";
 import { REST } from "@discordjs/rest";
 import { WebSocketManager } from "@discordjs/ws";
 import {
-    InteractionType, GatewayDispatchEvents, GatewayIntentBits, MessageFlags, ApplicationCommandType, ApplicationIntegrationType, InteractionContextType, PermissionFlagsBits, ApplicationCommandOptionType, ComponentType,
+    InteractionType, GatewayDispatchEvents, GatewayIntentBits, MessageFlags, ApplicationCommandType, ApplicationIntegrationType, InteractionContextType, PermissionFlagsBits, ApplicationCommandOptionType, ComponentType, GuildMemberFlags, ChannelType,
     type APIChatInputApplicationCommandInteractionData, type APIApplicationCommandInteractionDataOption, type RESTPostAPIChannelMessageJSONBody,
 } from "discord-api-types/v10";
-import { getCounting, setCounting, unsetCounting, resetCounting, initDb, updateCounting, setUserTimezone, removeUserTimezone, getGuildTimezones, removeGuild, setGuildTimezoneMessage, getGuildTimezoneMessage, getTimezoneMessages } from "./db";
+import { getCounting, setCounting, unsetCounting, resetCounting, initDb, updateCounting, setUserTimezone, removeUserTimezone, getGuildTimezones, removeGuild, setGuildTimezoneMessage, getGuildTimezoneMessage, getTimezoneMessages, getGuildActions, setGuildActions, removeGuildTimezoneMessageByChannelId, removeGuildTimezoneMessageByMsgId, removeGuildActionsLogByChannelId, removeGuildActionsRoleByRoleId, removeCountingByChannelId, removeGuildActions } from "./db";
 import { getTimeZones, type Timezone } from "./timezones" with {type: "macro"};
 const _timezones = getTimeZones();
 const getTimezones = () => _timezones;
@@ -44,6 +44,61 @@ client.on(GatewayDispatchEvents.GuildDelete, async ({ data: guild, api }) => {
 client.on(GatewayDispatchEvents.GuildMemberRemove, async ({ data: member, api }) => {
     if (!member.guild_id || !member.user?.id) return;
     await removeUserTimezone(member.guild_id, member.user.id);
+
+    const guildActions = await getGuildActions(member.guild_id);
+    if (guildActions?.log_channel_id) {
+        try {
+            await api.channels.createMessage(guildActions.log_channel_id, {
+                content: `:sob: <@${member.user.id}> has left.`,
+                allowed_mentions: {},
+            });
+        } catch (err) {
+            console.error(`Failed to create leave message: ${err}`);
+        }
+    }
+});
+client.on(GatewayDispatchEvents.GuildMemberAdd, async ({ data: member, api }) => {
+    if (!member.guild_id || !member.user?.id) return;
+
+    const guildActions = await getGuildActions(member.guild_id);
+    if (guildActions?.log_channel_id) {
+        try {
+            await api.channels.createMessage(guildActions.log_channel_id, {
+                content: `:tada: <@${member.user.id}> has joined!` + (hasBitfield(member.flags, GuildMemberFlags.DidRejoin) ? " (again)" : ""),
+                allowed_mentions: {},
+            });
+        } catch (err) {
+            console.error(`Failed to create join message: ${err}`);
+        }
+    }
+});
+client.on(GatewayDispatchEvents.GuildMemberUpdate, async ({ data: member, api }) => {
+    if (!member.guild_id || !member.user?.id) return;
+
+    const guildActions = await getGuildActions(member.guild_id);
+    console.log(guildActions?.join_role_id, member.roles, member.flags);
+    if (
+        guildActions?.join_role_id
+        && !member.roles.includes(guildActions.join_role_id)
+        && member.flags && hasBitfield(member.flags, GuildMemberFlags.CompletedOnboarding)
+    ) {
+        try {
+            await api.guilds.addRoleToMember(member.guild_id, member.user.id, guildActions.join_role_id, { reason: "user completed onboarding" })
+        } catch (err) {
+            console.error(`Failed to add join role to user: ${err}`);
+        }
+    }
+});
+
+client.on(GatewayDispatchEvents.ChannelDelete, async ({ data: channel, api }) => {
+    if (!channel.guild_id || !channel.id) return;
+    await removeGuildTimezoneMessageByChannelId(channel.guild_id, channel.id);
+    await removeCountingByChannelId(channel.guild_id, channel.id);
+    await removeGuildActionsLogByChannelId(channel.guild_id, channel.id);
+});
+client.on(GatewayDispatchEvents.GuildRoleDelete, async ({ data: role, api }) => {
+    if (!role.guild_id || !role.role_id) return;
+    await removeGuildActionsRoleByRoleId(role.guild_id, role.role_id);
 });
 
 client.on(GatewayDispatchEvents.MessageCreate, async ({ data: message, api }) => {
@@ -121,14 +176,18 @@ client.on(GatewayDispatchEvents.MessageCreate, async ({ data: message, api }) =>
 
 client.on(GatewayDispatchEvents.MessageDelete, async ({ data: msgDelete, api }) => {
     try {
-        const channelId = msgDelete.channel_id;
-        const counting = await getCounting(channelId);
-        if (!counting) return;
-        let latest = counting.last_msg;
-        if (!latest || latest.message_id !== msgDelete.id) return;
-        await api.channels.createMessage(channelId, {
-            content: `<@${latest.author_id}> why u delete **"${latest.number.toLocaleString()}"**?`
-        });
+        await removeGuildTimezoneMessageByMsgId(msgDelete.guild_id!, msgDelete.id);
+
+        countingModule: {
+            const channelId = msgDelete.channel_id;
+            const counting = await getCounting(channelId);
+            if (!counting) break countingModule;
+            let latest = counting.last_msg;
+            if (!latest || latest.message_id !== msgDelete.id) break countingModule;
+            await api.channels.createMessage(channelId, {
+                content: `<@${latest.author_id}> why u delete **"${latest.number.toLocaleString()}"**?`
+            });
+        }
     } catch (err) {
         console.error(`Error handling messageDelete: ${err}`)
     };
@@ -461,6 +520,64 @@ client.on(GatewayDispatchEvents.InteractionCreate, async ({ data: interaction, a
                     }
                     break;
                 }
+                case "welcome-actions": {
+                    const { options } = getSubcommandAndOptions(interaction.data);
+                    const guildId = interaction.guild_id;
+                    const roleId = options.role
+                    const channelId = options.channel;
+
+                    if (!roleId && !channelId) {
+                        await removeGuildActions(guildId);
+                        await api.interactions.reply(interaction.id, interaction.token, {
+                            content: `🗑️ Welcome actions have been removed.`,
+                            allowed_mentions: {},
+                        });
+                        return;
+                    }
+
+                    if (roleId) {
+                        if (!hasBitfield2(interaction.app_permissions, PermissionFlagsBits.ManageRoles)) {
+                            await api.interactions.reply(interaction.id, interaction.token, {
+                                content: `❌ I need Manage Roles permission to set a welcome role.`,
+                                flags: MessageFlags.Ephemeral,
+                                allowed_mentions: {},
+                            });
+                            return;
+                        }
+                        const role = interaction.data.resolved?.roles?.[roleId as string];
+                        if (role?.managed) {
+                            await api.interactions.reply(interaction.id, interaction.token, {
+                                content: `❌ I cannot set a bot role as a welcome role.`,
+                                flags: MessageFlags.Ephemeral,
+                                allowed_mentions: {},
+                            });
+                            return;
+                        }
+                    }
+                    if (channelId) {
+                        try {
+                            await api.channels.createMessage(channelId as string, {
+                                content: `This channel has been set as the welcome channel for this server! I'll send join/leave messages here when users complete onboarding.`,
+                                allowed_mentions: {},
+                            });
+                        } catch (err) {
+                            await api.interactions.reply(interaction.id, interaction.token, {
+                                content: `❌ I need Send Messages permission to set a welcome channel.`,
+                                flags: MessageFlags.Ephemeral,
+                                allowed_mentions: {},
+                            });
+                            return;
+                        }
+                    }
+
+                    await setGuildActions(guildId, { join_role_id: roleId as string || null, log_channel_id: channelId as string || null });
+                    await api.interactions.reply(interaction.id, interaction.token, {
+                        content: `✅ Welcome actions have been updated!` +
+                            (roleId ? ` New members will be given <@&${roleId}> role when they complete onboarding.` : "") +
+                            (channelId ? ` Join/leave messages will be sent in <#${channelId}>.` : ""),
+                        allowed_mentions: {}
+                    });
+                }
             }
         }
     } catch (err) {
@@ -563,6 +680,35 @@ client.once(GatewayDispatchEvents.Ready, async (c) => {
             integration_types: [ApplicationIntegrationType.GuildInstall],
             contexts: [InteractionContextType.Guild],
         },
+        {
+            name: "welcome-actions",
+            description: "Set welcome actions (not setting option will remove that action)",
+            type: ApplicationCommandType.ChatInput,
+            options: [
+                {
+                    type: ApplicationCommandOptionType.Role,
+                    name: "role",
+                    description: "The role to give to users when they complete onboarding",
+                    required: false,
+                },
+                {
+                    type: ApplicationCommandOptionType.Channel,
+                    name: "channel",
+                    description: "The channel to send join/leave messages in",
+                    required: false,
+                    channel_types: [
+                        ChannelType.GuildText,
+                        ChannelType.GuildAnnouncement,
+                        ChannelType.PublicThread,
+                        ChannelType.PrivateThread,
+                        ChannelType.AnnouncementThread,
+                    ],
+                },
+            ],
+            default_member_permissions: (PermissionFlagsBits.ManageRoles | PermissionFlagsBits.ManageChannels).toString(),
+            integration_types: [ApplicationIntegrationType.GuildInstall],
+            contexts: [InteractionContextType.Guild],
+        },
     ]);
 
     for (const cmd of commandsRes) {
@@ -613,5 +759,9 @@ function searchTimezones(query: string): Timezone[] {
 
 const trim = (str: string, max: number) => str.length > max ? str.slice(0, max - 1) + "…" : str;
 const hasBitfield = (flags: number, bitfield: number) => (flags & bitfield) === bitfield;
+const hasBitfield2 = (flags: string, bitfield: bigint) => {
+    if (typeof flags !== "string") return false;
+    return (BigInt(flags) & bitfield) === bitfield;
+};
 
 gateway.connect();
