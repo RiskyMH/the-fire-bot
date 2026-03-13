@@ -76,7 +76,6 @@ client.on(GatewayDispatchEvents.GuildMemberUpdate, async ({ data: member, api })
     if (!member.guild_id || !member.user?.id) return;
 
     const guildActions = await getGuildActions(member.guild_id);
-    console.log(guildActions?.join_role_id, member.roles, member.flags);
     if (
         guildActions?.join_role_id
         && !member.roles.includes(guildActions.join_role_id)
