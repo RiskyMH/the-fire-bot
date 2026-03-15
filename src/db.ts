@@ -117,9 +117,9 @@ export async function updateCounting(
 ): Promise<void> {
   await db`
     UPDATE counting SET
-    count = COALESCE(${fields.count}, count),
-    highscore = COALESCE(${fields.highscore}, highscore),
-    last_msg = COALESCE(${fields.last_msg ? JSON.stringify(fields.last_msg) : null}, last_msg)
+    count = ${fields.count ? fields.count : db`count`},
+    highscore = ${fields.highscore ? fields.highscore : db`highscore`},
+    last_msg = ${fields.last_msg ? JSON.stringify(fields.last_msg) : fields.last_msg === null ? null : db`last_msg`}
     WHERE channel_id = ${channel_id}
     `;
 }

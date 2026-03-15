@@ -166,7 +166,10 @@ client.on(GatewayDispatchEvents.MessageCreate, async ({ data: message, api }) =>
                 highscore: Math.max(highscore ?? 0, count + 1),
                 last_msg: nextMsg
             });
-            await api.channels.addMessageReaction(message.channel_id, message.id, (highscore ?? 0) <= (count + 1) ? '☑️' : '✅');
+            await api.channels.addMessageReaction(message.channel_id, message.id,
+                // (highscore ?? 0) <= (count + 1) ? '☑️' : '✅'
+                (highscore ?? 0) <= (count + 1) ? 'fobble:1472202109041770557' : 'fire:1281081113338450012'
+            );
         }
     } catch (err) {
         console.error(`Error handling messageCreate: ${err}`);
