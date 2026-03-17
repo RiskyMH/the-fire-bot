@@ -2,7 +2,7 @@ import { Client } from "@discordjs/core";
 import { REST } from "@discordjs/rest";
 import { WebSocketManager } from "@discordjs/ws";
 import {
-    InteractionType, GatewayDispatchEvents, GatewayIntentBits, MessageFlags, ApplicationCommandType, ApplicationIntegrationType, InteractionContextType, PermissionFlagsBits, ApplicationCommandOptionType, ComponentType, GuildMemberFlags, ChannelType,
+    InteractionType, GatewayDispatchEvents, GatewayIntentBits, MessageFlags, ApplicationCommandType, ApplicationIntegrationType, InteractionContextType, PermissionFlagsBits, ApplicationCommandOptionType, ComponentType, GuildMemberFlags, ChannelType, MessageType,
     type APIChatInputApplicationCommandInteractionData, type APIApplicationCommandInteractionDataOption, type RESTPostAPIChannelMessageJSONBody,
 } from "discord-api-types/v10";
 import { getCounting, setCounting, unsetCounting, resetCounting, initDb, updateCounting, setUserTimezone, removeUserTimezone, getGuildTimezones, removeGuild, setGuildTimezoneMessage, getGuildTimezoneMessage, getTimezoneMessages, getGuildActions, setGuildActions, removeGuildTimezoneMessageByChannelId, removeGuildTimezoneMessageByMsgId, removeGuildActionsLogByChannelId, removeGuildActionsRoleByRoleId, removeCountingByChannelId, removeGuildActions } from "./db";
@@ -103,8 +103,8 @@ client.on(GatewayDispatchEvents.GuildRoleDelete, async ({ data: role, api }) => 
 client.on(GatewayDispatchEvents.MessageCreate, async ({ data: message, api }) => {
     try {
         let lowerContent = (message.content || '').toLowerCase();
-        if ((lowerContent === 'hi' || lowerContent === 'hello')) {
-            await api.channels.addMessageReaction(message.channel_id, message.id, '👋');
+        if ((lowerContent === 'hi' || lowerContent === 'hello' || message.type === MessageType.UserJoin)) {
+            await api.channels.addMessageReaction(message.channel_id, message.id, 'wave:1483351276862574763');
             return;
         }
 
@@ -128,7 +128,7 @@ client.on(GatewayDispatchEvents.MessageCreate, async ({ data: message, api }) =>
             if (message.content?.includes('☑️') || message.content?.includes('✅')) {
                 // hopefully be cheaty only after the normal tick reaction is added
                 setTimeout(api.channels.addMessageReaction.bind(null, message.channel_id, message.id, '🤨'), 200);
-                // intentionally not breaking here so that it also checks the number if they reacted with the cheaty emoji
+                // intentionally not breaking here so that it also checks the number but still reacts with the cheaty emoji
             }
 
             const num = Number.parseInt(message.content);
@@ -138,7 +138,8 @@ client.on(GatewayDispatchEvents.MessageCreate, async ({ data: message, api }) =>
                     content: `⚠️ <@${message.author.id}> Wait for someone else to send **${(count + 1).toLocaleString()}.**`,
                     message_reference: { message_id: message.id }
                 });
-                await api.channels.addMessageReaction(message.channel_id, message.id, '⚠️');
+                // await api.channels.addMessageReaction(message.channel_id, message.id, '⚠️');
+                await api.channels.addMessageReaction(message.channel_id, message.id, 'warning:1483352438525399081');
                 break countingModule;
             }
             if (num === count + 2 || num === count) {
@@ -146,7 +147,8 @@ client.on(GatewayDispatchEvents.MessageCreate, async ({ data: message, api }) =>
                     content: `⚠️ <@${message.author.id}> You're close, but you actually need to send **${(count + 1).toLocaleString()}.**`,
                     message_reference: { message_id: message.id }
                 });
-                await api.channels.addMessageReaction(message.channel_id, message.id, '⚠️');
+                // await api.channels.addMessageReaction(message.channel_id, message.id, '⚠️');
+                await api.channels.addMessageReaction(message.channel_id, message.id, 'warning:1483352438525399081');
                 break countingModule;
             }
             if (num !== count + 1) {
@@ -156,7 +158,8 @@ client.on(GatewayDispatchEvents.MessageCreate, async ({ data: message, api }) =>
                     content: `⚠️ <@${message.author.id}> RUINED IT AT **${count.toLocaleString()}**!! Now next number is **${punishmentNumber + 1}.**`,
                     message_reference: { message_id: message.id }
                 });
-                await api.channels.addMessageReaction(message.channel_id, message.id, '❌');
+                // await api.channels.addMessageReaction(message.channel_id, message.id, '❌');
+                await api.channels.addMessageReaction(message.channel_id, message.id, 'cross:1483351988199620648');
                 break countingModule;
             }
 
