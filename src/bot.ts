@@ -171,7 +171,7 @@ client.on(GatewayDispatchEvents.MessageCreate, async ({ data: message, api }) =>
             });
             await api.channels.addMessageReaction(message.channel_id, message.id,
                 // (highscore ?? 0) <= (count + 1) ? '☑️' : '✅'
-                (highscore ?? 0) <= (count + 1) ? 'fobble:1472202109041770557' : 'fire:1281081113338450012'
+                (highscore ?? 0) <= (count + 1) ? 'fire_anim:1466557778071126300' : 'fire:1281081113338450012'
             );
         }
     } catch (err) {
