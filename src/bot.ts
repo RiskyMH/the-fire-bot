@@ -197,6 +197,26 @@ client.on(GatewayDispatchEvents.MessageDelete, async ({ data: msgDelete, api }) 
         console.error(`Error handling messageDelete: ${err}`)
     };
 });
+client.on(GatewayDispatchEvents.MessageDeleteBulk, async ({ data: msgDelete, api }) => {
+    try {
+        for (const msgId of msgDelete.ids) {
+            await removeGuildTimezoneMessageByMsgId(msgDelete.guild_id!, msgId);
+        }
+
+        countingModule: {
+            const channelId = msgDelete.channel_id;
+            const counting = await getCounting(channelId);
+            if (!counting) break countingModule;
+            let latest = counting.last_msg;
+            if (!latest || !msgDelete.ids.includes(latest.message_id)) break countingModule;
+            await api.channels.createMessage(channelId, {
+                content: `<@${latest.author_id}> why u delete **"${latest.number.toLocaleString()}"**?`
+            });
+        }
+    } catch (err) {
+        console.error(`Error handling messageDelete: ${err}`)
+    };
+});
 
 client.on(GatewayDispatchEvents.MessageUpdate, async ({ data: msgUpdate, api }) => {
     try {
