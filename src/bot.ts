@@ -131,7 +131,7 @@ client.on(GatewayDispatchEvents.MessageCreate, async ({ data: message, api }) =>
                 // intentionally not breaking here so that it also checks the number but still reacts with the cheaty emoji
             }
 
-            const num = Number.parseInt(message.content);
+            const num = Number.parseInt(message.content.replaceAll(',', ''));
             if (isNaN(num) || !num || num === 0) break countingModule;
             if (lastUser && (message.author.id === lastUser)) {
                 await api.channels.createMessage(message.channel_id, {
