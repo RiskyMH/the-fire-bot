@@ -279,7 +279,7 @@ function getFocusedAutoCompleteOption(opts: APIApplicationCommandInteractionData
 }
 
 
-async function generateTimezoneMessage(guildId: string): Promise<RESTPostAPIChannelMessageJSONBody | null> {
+async function generateTimezoneMessage(guildId: string, highlightUserId?: string | null): Promise<RESTPostAPIChannelMessageJSONBody | null> {
     const timezoneRows = await getGuildTimezones(guildId);
     if (!timezoneRows.length) return null;
 
@@ -313,7 +313,7 @@ async function generateTimezoneMessage(guildId: string): Promise<RESTPostAPIChan
         }, [])
         .sort((a, b) => a.offsetNum - b.offsetNum);
 
-    const lines = tzs.map(row => `* \`${row.localTime}\`  ${row.offsetStr}  •  ${row.user_ids.map(id => `<@${id}>`).join(" ")}`);
+    const lines = tzs.map(row => `* \`${row.localTime}\`  ${row.offsetStr}  •  ${row.user_ids.map(id => id === highlightUserId ? `__***<@${id}>***__` : `<@${id}>`).join(" ")}`);
     const withHowTo = commandIds["timezone"] ? `\n-# Use </timezone set:${commandIds["timezone"]}> to set your own timezone!` : "";
     const result = `### <a:fire:1466557778071126300> Server member timezones:\n` + lines.join("\n") + withHowTo;
 
@@ -479,7 +479,8 @@ client.on(GatewayDispatchEvents.InteractionCreate, async ({ data: interaction, a
                             });
                             return;
                         }
-                        const result = await generateTimezoneMessage(guildId);
+                        const userid = typeof options.highlight === 'string' ? options.highlight : interaction.user?.id ?? interaction.member?.user?.id;
+                        const result = await generateTimezoneMessage(guildId, userid);
                         if (!result) {
                             await api.interactions.reply(interaction.id, interaction.token, {
                                 content: `ℹ️ No members in this server have set a timezone yet! Use "/timezone set" to get started.`,
@@ -691,6 +692,15 @@ client.once(GatewayDispatchEvents.Ready, async (c) => {
                     type: ApplicationCommandOptionType.Subcommand,
                     name: "view",
                     description: "View all user's timezones in this server",
+                    options: [
+                        {
+                            type: ApplicationCommandOptionType.User,
+                            name: "highlight",
+                            description: "The user whose timezone you want to highlight (for easier finding in the list)",
+                            required: false,
+                        },
+                    ]
+
                 },
             ],
             integration_types: [ApplicationIntegrationType.GuildInstall],
