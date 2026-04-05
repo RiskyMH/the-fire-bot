@@ -152,7 +152,19 @@ client.on(GatewayDispatchEvents.MessageCreate, async ({ data: message, api }) =>
                 break countingModule;
             }
             if (num !== count + 1) {
-                const punishmentNumber = Math.max(0, Math.min(Math.round(count * (1 - (count > 25 ? 0.15 : 0.5))), count - 1));
+                const punishmentNumber = Math.max(
+                    // dont let it go negative
+                    0,
+                    Math.min(
+                        Math.max(
+                            // do either how much they were off by or % based on the count (to not fully die)
+                            count - Math.abs(count - num),
+                            Math.round(count * (1 - (count > 25 ? 0.15 : 0.5))),
+                        ),
+                        // always at least punish a little bit
+                        count - 1
+                    )
+                );
                 await updateCounting(message.channel_id, { count: punishmentNumber, last_msg: null });
                 await api.channels.createMessage(message.channel_id, {
                     content: `⚠️ <@${message.author.id}> RUINED IT AT **${count.toLocaleString()}**!! Now next number is **${punishmentNumber + 1}.**`,
