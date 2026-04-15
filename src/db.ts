@@ -64,6 +64,13 @@ export async function initDb() {
       FOREIGN KEY (guild_id) REFERENCES config(guild_id) ON DELETE CASCADE
     );
   `;
+  await db`
+    CREATE TABLE IF NOT EXISTS guild_tag (
+      guild_id TEXT PRIMARY KEY,
+      role_id TEXT,
+      FOREIGN KEY (guild_id) REFERENCES config(guild_id) ON DELETE CASCADE
+    );
+  `;
 }
 
 export async function removeGuild(guild_id: string): Promise<void> {
@@ -72,6 +79,7 @@ export async function removeGuild(guild_id: string): Promise<void> {
   await db`DELETE FROM timezone_user WHERE guild_id = ${guild_id}`;
   await db`DELETE FROM counting WHERE guild_id = ${guild_id}`;
   await db`DELETE FROM member_actions WHERE guild_id = ${guild_id}`;
+  await db`DELETE FROM guild_tag WHERE guild_id = ${guild_id}`;
 }
 
 export async function ensureConfig(guild_id: string): Promise<void> {
@@ -237,4 +245,26 @@ export async function removeGuildActionsRoleByRoleId(guild_id: string, role_id: 
     SET join_role_id = NULL
     WHERE guild_id = ${guild_id} AND join_role_id = ${role_id}
   `;
+}
+
+export async function getGuildTagRole(guild_id: string): Promise<{ role_id: string } | null> {
+  const result = await db`SELECT role_id FROM guild_tag WHERE guild_id = ${guild_id}`;
+  if (result.length === 0) return null;
+  return {
+    role_id: result[0].role_id,
+  };
+}
+
+export async function setGuildTagRole(guild_id: string, role_id: string): Promise<void> {
+  await ensureConfig(guild_id);
+  await db`
+    INSERT INTO guild_tag (guild_id, role_id)
+    VALUES (${guild_id}, ${role_id})
+    ON CONFLICT(guild_id) DO UPDATE SET
+      role_id = excluded.role_id;
+  `;
+}
+
+export async function removeGuildTagRole(guild_id: string): Promise<void> {
+  await db`DELETE FROM guild_tag WHERE guild_id = ${guild_id}`;
 }

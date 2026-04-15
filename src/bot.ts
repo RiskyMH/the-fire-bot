@@ -3,9 +3,9 @@ import { REST } from "@discordjs/rest";
 import { WebSocketManager } from "@discordjs/ws";
 import {
     InteractionType, GatewayDispatchEvents, GatewayIntentBits, MessageFlags, ApplicationCommandType, ApplicationIntegrationType, InteractionContextType, PermissionFlagsBits, ApplicationCommandOptionType, ComponentType, GuildMemberFlags, ChannelType, MessageType,
-    type APIChatInputApplicationCommandInteractionData, type APIApplicationCommandInteractionDataOption, type RESTPostAPIChannelMessageJSONBody,
+    type APIChatInputApplicationCommandInteractionData, type APIApplicationCommandInteractionDataOption, type RESTPostAPIChannelMessageJSONBody, type APIGuildMember,
 } from "discord-api-types/v10";
-import { getCounting, setCounting, unsetCounting, resetCounting, initDb, updateCounting, setUserTimezone, removeUserTimezone, getGuildTimezones, removeGuild, setGuildTimezoneMessage, getGuildTimezoneMessage, getTimezoneMessages, getGuildActions, setGuildActions, removeGuildTimezoneMessageByChannelId, removeGuildTimezoneMessageByMsgId, removeGuildActionsLogByChannelId, removeGuildActionsRoleByRoleId, removeCountingByChannelId, removeGuildActions } from "./db";
+import { getCounting, setCounting, unsetCounting, resetCounting, initDb, updateCounting, setUserTimezone, removeUserTimezone, getGuildTimezones, removeGuild, setGuildTimezoneMessage, getGuildTimezoneMessage, getTimezoneMessages, getGuildActions, setGuildActions, removeGuildTimezoneMessageByChannelId, removeGuildTimezoneMessageByMsgId, removeGuildActionsLogByChannelId, removeGuildActionsRoleByRoleId, removeCountingByChannelId, removeGuildActions, getGuildTagRole, setGuildTagRole, removeGuildTagRole } from "./db";
 import { getTimeZones, type Timezone } from "./timezones" with {type: "macro"};
 const _timezones = getTimeZones();
 const getTimezones = () => _timezones;
@@ -87,6 +87,27 @@ client.on(GatewayDispatchEvents.GuildMemberUpdate, async ({ data: member, api })
             console.error(`Failed to add join role to user: ${err}`);
         }
     }
+
+    const guildTag = await getGuildTagRole(member.guild_id);
+    if (guildTag?.role_id) {
+        if (member.user.primary_guild?.identity_guild_id === member.guild_id) {
+            if (!member.roles.includes(guildTag.role_id)) {
+                try {
+                    await api.guilds.addRoleToMember(member.guild_id, member.user.id, guildTag.role_id, { reason: "user has the guild tag" })
+                } catch (err) {
+                    console.error(`Failed to add guild tag role to user: ${err}`);
+                }
+            }
+        } else {
+            if (member.roles.includes(guildTag.role_id)) {
+                try {
+                    await api.guilds.removeRoleFromMember(member.guild_id, member.user.id, guildTag.role_id, { reason: "user no longer has the guild tag" })
+                } catch (err) {
+                    console.error(`Failed to remove guild tag role from user: ${err}`);
+                }
+            }
+        }
+    }
 });
 
 client.on(GatewayDispatchEvents.ChannelDelete, async ({ data: channel, api }) => {
@@ -102,9 +123,11 @@ client.on(GatewayDispatchEvents.GuildRoleDelete, async ({ data: role, api }) => 
 
 client.on(GatewayDispatchEvents.MessageCreate, async ({ data: message, api }) => {
     try {
+        const useCustomEmoji = true;
+
         let lowerContent = (message.content || '').toLowerCase();
         if ((lowerContent === 'hi' || lowerContent === 'hello' || message.type === MessageType.UserJoin)) {
-            await api.channels.addMessageReaction(message.channel_id, message.id, 'wave:1483351276862574763');
+            await api.channels.addMessageReaction(message.channel_id, message.id, useCustomEmoji ? 'wave:1483351276862574763' : "👋");
             return;
         }
 
@@ -139,7 +162,7 @@ client.on(GatewayDispatchEvents.MessageCreate, async ({ data: message, api }) =>
                     message_reference: { message_id: message.id }
                 });
                 // await api.channels.addMessageReaction(message.channel_id, message.id, '⚠️');
-                await api.channels.addMessageReaction(message.channel_id, message.id, 'warning:1483352438525399081');
+                await api.channels.addMessageReaction(message.channel_id, message.id, useCustomEmoji ? 'warning:1483352438525399081' : '⚠️');
                 break countingModule;
             }
             if (num === count + 2 || num === count) {
@@ -148,7 +171,7 @@ client.on(GatewayDispatchEvents.MessageCreate, async ({ data: message, api }) =>
                     message_reference: { message_id: message.id }
                 });
                 // await api.channels.addMessageReaction(message.channel_id, message.id, '⚠️');
-                await api.channels.addMessageReaction(message.channel_id, message.id, 'warning:1483352438525399081');
+                await api.channels.addMessageReaction(message.channel_id, message.id, useCustomEmoji ? 'warning:1483352438525399081' : '⚠️');
                 break countingModule;
             }
             if (num !== count + 1) {
@@ -171,7 +194,7 @@ client.on(GatewayDispatchEvents.MessageCreate, async ({ data: message, api }) =>
                     message_reference: { message_id: message.id }
                 });
                 // await api.channels.addMessageReaction(message.channel_id, message.id, '❌');
-                await api.channels.addMessageReaction(message.channel_id, message.id, 'cross:1483351988199620648');
+                await api.channels.addMessageReaction(message.channel_id, message.id, useCustomEmoji ? 'cross:1483351988199620648' : '❌');
                 break countingModule;
             }
 
@@ -183,7 +206,7 @@ client.on(GatewayDispatchEvents.MessageCreate, async ({ data: message, api }) =>
             });
             await api.channels.addMessageReaction(message.channel_id, message.id,
                 // (highscore ?? 0) <= (count + 1) ? '☑️' : '✅'
-                (highscore ?? 0) <= (count + 1) ? 'fire_anim:1466557778071126300' : 'fire:1281081113338450012'
+                (highscore ?? 0) <= (count + 1) ? (useCustomEmoji ? 'fire_anim:1466557778071126300' : '☑️') : (useCustomEmoji ? 'fire:1281081113338450012' : '✅')
             );
         }
     } catch (err) {
@@ -558,6 +581,102 @@ client.on(GatewayDispatchEvents.InteractionCreate, async ({ data: interaction, a
                     }
                     break;
                 }
+                case "guild-tag-role": {
+                    const { subcommand, options } = getSubcommandAndOptions(interaction.data);
+                    const guildId = interaction.guild_id;
+                    // subcommand: set/remove/view, option: role (on set)
+                    try {
+                        if (subcommand === "set") {
+                            if (!hasBitfield2(interaction.app_permissions, PermissionFlagsBits.ManageRoles)) {
+                                await api.interactions.reply(interaction.id, interaction.token, {
+                                    content: `❌ I need Manage Roles permission to set the guild tag role.`,
+                                    flags: MessageFlags.Ephemeral,
+                                    allowed_mentions: {},
+                                });
+                                return;
+                            }
+                            const roleId = options.role as string;
+                            if (!roleId) {
+                                await api.interactions.reply(interaction.id, interaction.token, {
+                                    content: `❌ You must specify a role to set as the guild tag role!`,
+                                    flags: MessageFlags.Ephemeral
+                                });
+                                return;
+                            }
+                            const role = interaction.data.resolved?.roles?.[roleId];
+                            if (!role) {
+                                await api.interactions.reply(interaction.id, interaction.token, {
+                                    content: `❌ The specified role could not be found (maybe it was deleted)!`,
+                                    flags: MessageFlags.Ephemeral
+                                });
+                                return;
+                            }
+                            if (role.managed) {
+                                await api.interactions.reply(interaction.id, interaction.token, {
+                                    content: `❌ You cannot set a bot-managed (integration/bot) role as a tag role.`,
+                                    flags: MessageFlags.Ephemeral
+                                });
+                                return;
+                            }
+                            await setGuildTagRole(guildId, roleId);
+                            await api.interactions.reply(interaction.id, interaction.token, {
+                                content: `✅ Tag role successfully set! Users with the server's guild tag will be given <@&${roleId}>.`,
+                                allowed_mentions: {},
+                            });
+
+                            // now check all members and update their roles accordingly
+                            let after: string | undefined = undefined;
+                            while (true) {
+                                const batch = await client.api.guilds.getMembers(guildId, { limit: 1000, after });
+                                await Promise.allSettled(batch.map(member => (() => {
+                                    const hasTag = member.user.primary_guild?.identity_guild_id === guildId;
+                                    const hasRole = member.roles.includes(roleId);
+                                    if (hasTag && !hasRole) {
+                                        return api.guilds.addRoleToMember(guildId, member.user.id, roleId, { reason: "guild tag role was set while user had the tag" }).catch(console.error);
+                                    } else if (!hasTag && hasRole) {
+                                        return api.guilds.removeRoleFromMember(guildId, member.user.id, roleId, { reason: "guild tag role was set while user didn't have the tag" }).catch(console.error);
+                                    }
+                                })()));
+
+                                after = batch[batch.length - 1]?.user.id;
+                                if (!after) break;
+                            }
+
+                            await api.interactions.editReply(interaction.id, interaction.token, {
+                                content: `✅ Tag role successfully set and updated for all members! Users with the server's guild tag will be given <@&${roleId}>.`,
+                                allowed_mentions: {},
+                            });
+
+
+                        } else if (subcommand === "remove") {
+                            await removeGuildTagRole(guildId);
+                            await api.interactions.reply(interaction.id, interaction.token, {
+                                content: `🗑️ The tag role has been removed for this guild.`,
+                                allowed_mentions: {},
+                            });
+                        } else if (subcommand === "view") {
+                            const rec = await getGuildTagRole(guildId);
+                            if (rec?.role_id) {
+                                await api.interactions.reply(interaction.id, interaction.token, {
+                                    content: `👁️ The current tag role is <@&${rec.role_id}>.`,
+                                    allowed_mentions: {},
+                                });
+                            } else {
+                                await api.interactions.reply(interaction.id, interaction.token, {
+                                    content: `ℹ️ There is no tag role set for this guild.`,
+                                    allowed_mentions: {},
+                                });
+                            }
+                        }
+                    } catch (e) {
+                        await api.interactions.reply(interaction.id, interaction.token, {
+                            content: `❌ Failed to update/view the guild tag role! (${e})`,
+                            flags: MessageFlags.Ephemeral,
+                        });
+                    }
+                    break;
+                }
+
                 case "welcome-actions": {
                     const { options } = getSubcommandAndOptions(interaction.data);
                     const guildId = interaction.guild_id;
@@ -728,6 +847,39 @@ client.once(GatewayDispatchEvents.Ready, async (c) => {
             contexts: [InteractionContextType.Guild],
         },
         {
+            name: "guild-tag-role",
+            description: "Set, remove, or view the guild tag role (special role for users with guild tag)",
+            type: ApplicationCommandType.ChatInput,
+            options: [
+                {
+                    type: ApplicationCommandOptionType.Subcommand,
+                    name: "set",
+                    description: "Set the tag role (will be assigned to users with guild tag)",
+                    options: [
+                        {
+                            type: ApplicationCommandOptionType.Role,
+                            name: "role",
+                            description: "The role to give to users with the guild tag",
+                            required: true,
+                        }
+                    ]
+                },
+                {
+                    type: ApplicationCommandOptionType.Subcommand,
+                    name: "remove",
+                    description: "Remove the current tag role setting, disabling the feature",
+                },
+                {
+                    type: ApplicationCommandOptionType.Subcommand,
+                    name: "view",
+                    description: "View the current tag role (if set for this guild)",
+                },
+            ],
+            default_member_permissions: PermissionFlagsBits.ManageRoles.toString(),
+            integration_types: [ApplicationIntegrationType.GuildInstall],
+            contexts: [InteractionContextType.Guild],
+        },
+        {
             name: "welcome-actions",
             description: "Set welcome actions (not setting option will remove that action)",
             type: ApplicationCommandType.ChatInput,
@@ -810,5 +962,18 @@ const hasBitfield2 = (flags: string, bitfield: bigint) => {
     if (typeof flags !== "string") return false;
     return (BigInt(flags) & bitfield) === bitfield;
 };
+
+
+async function getAllMembers(guildId: string) {
+    let members: APIGuildMember[] = [];
+    let after: string | undefined = undefined;
+    while (true) {
+        const batch = await client.api.guilds.getMembers(guildId, { limit: 1000, after });
+        members = members.concat(batch);
+        if (batch.length < 1000) break;
+        after = batch[batch.length - 1]!.user.id;
+    }
+    return members;
+}
 
 gateway.connect();
