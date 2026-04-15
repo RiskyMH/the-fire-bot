@@ -642,7 +642,7 @@ client.on(GatewayDispatchEvents.InteractionCreate, async ({ data: interaction, a
                                 if (!after) break;
                             }
 
-                            await api.interactions.editReply(interaction.id, interaction.token, {
+                            await api.interactions.editReply(interaction.application_id, interaction.token, {
                                 content: `✅ Tag role successfully set and updated for all members! Users with the server's guild tag will be given <@&${roleId}>.`,
                                 allowed_mentions: {},
                             });
@@ -963,17 +963,5 @@ const hasBitfield2 = (flags: string, bitfield: bigint) => {
     return (BigInt(flags) & bitfield) === bitfield;
 };
 
-
-async function getAllMembers(guildId: string) {
-    let members: APIGuildMember[] = [];
-    let after: string | undefined = undefined;
-    while (true) {
-        const batch = await client.api.guilds.getMembers(guildId, { limit: 1000, after });
-        members = members.concat(batch);
-        if (batch.length < 1000) break;
-        after = batch[batch.length - 1]!.user.id;
-    }
-    return members;
-}
 
 gateway.connect();
