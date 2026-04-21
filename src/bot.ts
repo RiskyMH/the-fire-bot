@@ -181,7 +181,7 @@ client.on(GatewayDispatchEvents.MessageCreate, async ({ data: message, api }) =>
                     Math.min(
                         Math.max(
                             // do either how much they were off by or % based on the count (to not fully die)
-                            count - Math.abs(count - num),
+                            (count - Math.round(Math.abs(count - num) * (Math.random() + 1))),
                             Math.round(count * (1 - (count > 25 ? 0.15 : 0.5))),
                         ),
                         // always at least punish a little bit
@@ -808,7 +808,7 @@ client.once(GatewayDispatchEvents.Ready, async (c) => {
                         {
                             type: ApplicationCommandOptionType.String,
                             name: "timezone",
-                            description: "Your current timezone that you want to set to be shown publically",
+                            description: "Your current timezone that you want to set to be shown publicly",
                             required: true,
                             autocomplete: true,
                         },
