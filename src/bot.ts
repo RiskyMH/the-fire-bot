@@ -181,7 +181,7 @@ client.on(GatewayDispatchEvents.MessageCreate, async ({ data: message, api }) =>
                     Math.min(
                         Math.max(
                             // do either how much they were off by or % based on the count (to not fully die)
-                            (count - Math.round(Math.abs(count - num) * (Math.random() + 1))),
+                            (count - Math.round(Math.abs(count - num) * ((Math.random() * 2) + 1.35))),
                             Math.round(count * (1 - (count > 25 ? 0.15 : 0.5))),
                         ),
                         // always at least punish a little bit
