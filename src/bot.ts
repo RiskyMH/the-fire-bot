@@ -759,6 +759,13 @@ client.on(GatewayDispatchEvents.InteractionCreate, async ({ data: interaction, a
                             });
                             return;
                         }
+                        if (!hasBitfield2(interaction.app_permissions, PermissionFlagsBits.ManageNicknames)) {
+                            await api.interactions.reply(interaction.id, interaction.token, {
+                                content: `❌ I need Manage Nicknames permission to force nicknames!`,
+                                flags: MessageFlags.Ephemeral
+                            });
+                            return;
+                        }
                         const member = interaction.data.resolved?.members?.[userId];
                         if (!member) {
                             await api.interactions.reply(interaction.id, interaction.token, {
@@ -767,12 +774,16 @@ client.on(GatewayDispatchEvents.InteractionCreate, async ({ data: interaction, a
                             });
                             return;
                         }
-                        await setForceNick(guildId, userId, nickname);
                         try {
                             await api.guilds.editMember(guildId, userId, { nick: nickname }, { reason: "force-nick set" });
                         } catch (err) {
-                            console.error(`Error editing member: ${err}`);
+                            await api.interactions.reply(interaction.id, interaction.token, {
+                                content: `❌ Failed to set nickname, please ensure I have permissions to do this.`,
+                                flags: MessageFlags.Ephemeral
+                            });
+                            return;
                         }
+                        await setForceNick(guildId, userId, nickname);
                         await api.interactions.reply(interaction.id, interaction.token, {
                             content: `✅ <@${userId}> will now be forced to have the nickname **${nickname}**.`,
                             allowed_mentions: {}
