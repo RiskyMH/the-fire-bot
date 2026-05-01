@@ -5,7 +5,7 @@ import {
     InteractionType, GatewayDispatchEvents, GatewayIntentBits, MessageFlags, ApplicationCommandType, ApplicationIntegrationType, InteractionContextType, PermissionFlagsBits, ApplicationCommandOptionType, ComponentType, GuildMemberFlags, ChannelType, MessageType,
     type APIChatInputApplicationCommandInteractionData, type APIApplicationCommandInteractionDataOption, type RESTPostAPIChannelMessageJSONBody, type APIGuildMember,
 } from "discord-api-types/v10";
-import { getCounting, setCounting, unsetCounting, resetCounting, initDb, updateCounting, setUserTimezone, removeUserTimezone, getGuildTimezones, removeGuild, setGuildTimezoneMessage, getGuildTimezoneMessage, getTimezoneMessages, getGuildActions, setGuildActions, removeGuildTimezoneMessageByChannelId, removeGuildTimezoneMessageByMsgId, removeGuildActionsLogByChannelId, removeGuildActionsRoleByRoleId, removeCountingByChannelId, removeGuildActions, getGuildTagRole, setGuildTagRole, removeGuildTagRole } from "./db";
+import { getCounting, setCounting, unsetCounting, resetCounting, initDb, updateCounting, setUserTimezone, removeUserTimezone, getGuildTimezones, removeGuild, setGuildTimezoneMessage, getGuildTimezoneMessage, getTimezoneMessages, getGuildActions, setGuildActions, removeGuildTimezoneMessageByChannelId, removeGuildTimezoneMessageByMsgId, removeGuildActionsLogByChannelId, removeGuildActionsRoleByRoleId, removeCountingByChannelId, removeGuildActions, getGuildTagRole, setGuildTagRole, removeGuildTagRole, setForceNick, removeForceNick, getForceNick, getGuildForceNicks, removeUserForceNicksEverywhere, removeAllForceNicks } from "./db";
 import { getTimeZones, type Timezone } from "./timezones" with {type: "macro"};
 const _timezones = getTimeZones();
 const getTimezones = () => _timezones;
@@ -44,6 +44,7 @@ client.on(GatewayDispatchEvents.GuildDelete, async ({ data: guild, api }) => {
 client.on(GatewayDispatchEvents.GuildMemberRemove, async ({ data: member, api }) => {
     if (!member.guild_id || !member.user?.id) return;
     await removeUserTimezone(member.guild_id, member.user.id);
+    await removeForceNick(member.guild_id, member.user.id);
 
     const guildActions = await getGuildActions(member.guild_id);
     if (guildActions?.log_channel_id) {
@@ -106,6 +107,15 @@ client.on(GatewayDispatchEvents.GuildMemberUpdate, async ({ data: member, api })
                     console.error(`Failed to remove guild tag role from user: ${err}`);
                 }
             }
+        }
+    }
+
+    const forcedNick = await getForceNick(member.guild_id, member.user.id);
+    if (forcedNick && member.nick != forcedNick) {
+        try {
+            await api.guilds.editMember(member.guild_id, member.user.id, { nick: forcedNick }, { reason: "force-nick active" })
+        } catch (err) {
+            console.error(`Failed to force nick for user: ${err}`);
         }
     }
 });
@@ -735,6 +745,82 @@ client.on(GatewayDispatchEvents.InteractionCreate, async ({ data: interaction, a
                         allowed_mentions: {}
                     });
                 }
+                    break;
+                case "force-nick": {
+                    const { subcommand, options } = getSubcommandAndOptions(interaction.data);
+                    const guildId = interaction.guild_id;
+                    if (subcommand === "set") {
+                        const userId = options.user as string;
+                        const nickname = options.nickname as string;
+                        if (!userId || !nickname) {
+                            await api.interactions.reply(interaction.id, interaction.token, {
+                                content: `❌ You must specify a user and a nickname!`,
+                                flags: MessageFlags.Ephemeral
+                            });
+                            return;
+                        }
+                        const member = interaction.data.resolved?.members?.[userId];
+                        if (!member) {
+                            await api.interactions.reply(interaction.id, interaction.token, {
+                                content: `❌ The specified user is not in this server!`,
+                                flags: MessageFlags.Ephemeral
+                            });
+                            return;
+                        }
+                        await setForceNick(guildId, userId, nickname);
+                        try {
+                            await api.guilds.editMember(guildId, userId, { nick: nickname }, { reason: "force-nick set" });
+                        } catch (err) {
+                            console.error(`Error editing member: ${err}`);
+                        }
+                        await api.interactions.reply(interaction.id, interaction.token, {
+                            content: `✅ <@${userId}> will now be forced to have the nickname **${nickname}**.`,
+                            allowed_mentions: {}
+                        });
+                    } else if (subcommand === "unset") {
+                        const userId = options.user as string;
+                        if (!userId) {
+                            await api.interactions.reply(interaction.id, interaction.token, {
+                                content: `❌ You must specify a user!`,
+                                flags: MessageFlags.Ephemeral
+                            });
+                            return;
+                        }
+                        const removed = await removeForceNick(guildId, userId);
+                        if (removed) {
+                            await api.interactions.reply(interaction.id, interaction.token, {
+                                content: `🗑️ <@${userId}> no longer has a forced nickname.`,
+                                allowed_mentions: {}
+                            });
+                        } else {
+                            await api.interactions.reply(interaction.id, interaction.token, {
+                                content: `ℹ️ <@${userId}> didn't have a forced nickname.`,
+                                allowed_mentions: {}
+                            });
+                        }
+                    } else if (subcommand === "view") {
+                        const nicks = await getGuildForceNicks(guildId);
+                        if (nicks.length === 0) {
+                            await api.interactions.reply(interaction.id, interaction.token, {
+                                content: `ℹ️ No users have forced nicknames in this server.`,
+                                flags: MessageFlags.Ephemeral
+                            });
+                            return;
+                        }
+                        const lines = nicks.map(n => `- <@${n.user_id}> → **${n.forced_nick}**`);
+                        await api.interactions.reply(interaction.id, interaction.token, {
+                            content: `**Forced Nicknames:**\n${lines.join("\n")}`,
+                            allowed_mentions: {}
+                        });
+                    } else if (subcommand === "resetall") {
+                        const count = await removeAllForceNicks(guildId);
+                        await api.interactions.reply(interaction.id, interaction.token, {
+                            content: `🗑️ Removed forced nicknames from **${count}** user${count === 1 ? '' : 's'}.`,
+                            allowed_mentions: {}
+                        });
+                    }
+                    break;
+                }
             }
         }
     } catch (err) {
@@ -905,6 +991,60 @@ client.once(GatewayDispatchEvents.Ready, async (c) => {
                 },
             ],
             default_member_permissions: (PermissionFlagsBits.ManageRoles | PermissionFlagsBits.ManageChannels).toString(),
+            integration_types: [ApplicationIntegrationType.GuildInstall],
+            contexts: [InteractionContextType.Guild],
+        },
+        {
+            name: "force-nick",
+            description: "Force a user's nickname (bot will revert any changes)",
+            type: ApplicationCommandType.ChatInput,
+            options: [
+                {
+                    type: ApplicationCommandOptionType.Subcommand,
+                    name: "set",
+                    description: "Set a forced nickname for a user",
+                    options: [
+                        {
+                            type: ApplicationCommandOptionType.User,
+                            name: "user",
+                            description: "The user to force a nickname on",
+                            required: true,
+                        },
+                        {
+                            type: ApplicationCommandOptionType.String,
+                            name: "nickname",
+                            description: "The nickname to force (must be 1-32 characters)",
+                            required: true,
+                            min_length: 1,
+                            max_length: 32,
+                        },
+                    ],
+                },
+                {
+                    type: ApplicationCommandOptionType.Subcommand,
+                    name: "unset",
+                    description: "Remove the forced nickname for a user",
+                    options: [
+                        {
+                            type: ApplicationCommandOptionType.User,
+                            name: "user",
+                            description: "The user to remove forced nickname from",
+                            required: true,
+                        },
+                    ],
+                },
+                {
+                    type: ApplicationCommandOptionType.Subcommand,
+                    name: "view",
+                    description: "View all forced nicknames in this server",
+                },
+                {
+                    type: ApplicationCommandOptionType.Subcommand,
+                    name: "resetall",
+                    description: "Remove ALL forced nicknames in this server",
+                },
+            ],
+            default_member_permissions: PermissionFlagsBits.ManageNicknames.toString(),
             integration_types: [ApplicationIntegrationType.GuildInstall],
             contexts: [InteractionContextType.Guild],
         },

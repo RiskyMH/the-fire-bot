@@ -17,7 +17,12 @@ export type ITimezone = {
 export type ITimezoneMessage = {
   guild_id: string;
   channel_id: string;
-  message_id: string;
+  message_id: string,
+}
+export type IForceNick = {
+  guild_id: string;
+  user_id: string;
+  forced_nick: string;
 }
 
 export const db = new SQL(process.env.DATABASE_URL || "sqlite://db.sqlite");
@@ -71,6 +76,15 @@ export async function initDb() {
       FOREIGN KEY (guild_id) REFERENCES config(guild_id) ON DELETE CASCADE
     );
   `;
+  await db`
+    CREATE TABLE IF NOT EXISTS force_nick (
+      guild_id TEXT NOT NULL,
+      user_id TEXT NOT NULL,
+      forced_nick TEXT NOT NULL,
+      PRIMARY KEY (guild_id, user_id),
+      FOREIGN KEY (guild_id) REFERENCES config(guild_id) ON DELETE CASCADE
+    );
+  `;
 }
 
 export async function removeGuild(guild_id: string): Promise<void> {
@@ -80,6 +94,7 @@ export async function removeGuild(guild_id: string): Promise<void> {
   await db`DELETE FROM counting WHERE guild_id = ${guild_id}`;
   await db`DELETE FROM member_actions WHERE guild_id = ${guild_id}`;
   await db`DELETE FROM guild_tag WHERE guild_id = ${guild_id}`;
+  await db`DELETE FROM force_nick WHERE guild_id = ${guild_id}`;
 }
 
 export async function ensureConfig(guild_id: string): Promise<void> {
@@ -267,4 +282,38 @@ export async function setGuildTagRole(guild_id: string, role_id: string): Promis
 
 export async function removeGuildTagRole(guild_id: string): Promise<void> {
   await db`DELETE FROM guild_tag WHERE guild_id = ${guild_id}`;
+}
+
+export async function setForceNick(guild_id: string, user_id: string, forced_nick: string): Promise<void> {
+  await ensureConfig(guild_id);
+  await db`
+    INSERT INTO force_nick (guild_id, user_id, forced_nick)
+    VALUES (${guild_id}, ${user_id}, ${forced_nick})
+    ON CONFLICT(guild_id, user_id) DO UPDATE SET
+      forced_nick = excluded.forced_nick;
+  `;
+}
+
+export async function removeForceNick(guild_id: string, user_id: string): Promise<boolean> {
+  const result = await db`DELETE FROM force_nick WHERE guild_id = ${guild_id} AND user_id = ${user_id}`;
+  return result.changes && result.changes > 0;
+}
+
+export async function getForceNick(guild_id: string, user_id: string): Promise<string | null> {
+  const result = await db`SELECT forced_nick FROM force_nick WHERE guild_id = ${guild_id} AND user_id = ${user_id}`;
+  return result.length > 0 ? result[0].forced_nick : null;
+}
+
+export async function getGuildForceNicks(guild_id: string): Promise<{ user_id: string, forced_nick: string }[]> {
+  const result = await db`SELECT user_id, forced_nick FROM force_nick WHERE guild_id = ${guild_id}`;
+  return Array.isArray(result) ? result : [];
+}
+
+export async function removeUserForceNicksEverywhere(user_id: string): Promise<void> {
+  await db`DELETE FROM force_nick WHERE user_id = ${user_id}`;
+}
+
+export async function removeAllForceNicks(guild_id: string): Promise<number> {
+  const result = await db`DELETE FROM force_nick WHERE guild_id = ${guild_id}`;
+  return result.changes || 0;
 }
