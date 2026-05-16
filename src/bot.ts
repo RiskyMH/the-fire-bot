@@ -166,7 +166,7 @@ client.on(GatewayDispatchEvents.MessageCreate, async ({ data: message, api }) =>
 
             const num = Number.parseInt(message.content.replaceAll(',', ''));
             if (isNaN(num) || !num || num === 0) break countingModule;
-            if (lastUser && (message.author.id === lastUser)) {
+            if (lastUser && last_msg?.failed !== true && (message.author.id === lastUser)) {
                 await api.channels.createMessage(message.channel_id, {
                     content: `⚠️ <@${message.author.id}> Wait for someone else to send **${(count + 1).toLocaleString()}.**`,
                     message_reference: { message_id: message.id }
@@ -185,6 +185,12 @@ client.on(GatewayDispatchEvents.MessageCreate, async ({ data: message, api }) =>
                 break countingModule;
             }
             if (num !== count + 1) {
+                if (lastUser && last_msg?.failed && (message.author.id === lastUser)) {
+                    // don't let them get away with 2 failes in a row - just ignore them
+                    await api.channels.addMessageReaction(message.channel_id, message.id, useCustomEmoji ? 'cross:1483351988199620648' : '❌');
+                    break countingModule;
+                }
+
                 const punishmentNumber = Math.max(
                     // dont let it go negative
                     0,
@@ -198,7 +204,8 @@ client.on(GatewayDispatchEvents.MessageCreate, async ({ data: message, api }) =>
                         count - 1
                     )
                 );
-                await updateCounting(message.channel_id, { count: punishmentNumber, last_msg: null });
+                let nextMsg = { message_id: message.id, author_id: message.author.id, number: num, failed: true };
+                await updateCounting(message.channel_id, { count: punishmentNumber, last_msg: nextMsg });
                 await api.channels.createMessage(message.channel_id, {
                     content: `⚠️ <@${message.author.id}> RUINED IT AT **${count.toLocaleString()}**!! Now next number is **${punishmentNumber + 1}.**`,
                     message_reference: { message_id: message.id }

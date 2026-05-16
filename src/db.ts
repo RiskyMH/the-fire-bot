@@ -8,7 +8,7 @@ export type ICounting = {
   channel_id: string;
   count: number;
   highscore?: number;
-  last_msg?: { message_id: string, author_id: string, number: number } | null,
+  last_msg?: { message_id: string, author_id: string, number: number, failed?: boolean } | null,
 };
 export type ITimezone = {
   user_id: string;
