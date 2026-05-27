@@ -455,8 +455,15 @@ client.on(GatewayDispatchEvents.InteractionCreate, async ({ data: interaction, a
                         });
                     } else if (subcommand === "view") {
                         const count = await getCounting(channelId);
+                        if (!count) {
+                            await api.interactions.reply(interaction.id, interaction.token, {
+                                content: `ℹ️ This channel is not a counting channel yet. Use </counting set:${commandIds.counting}> to set it up!`,
+                                flags: MessageFlags.Ephemeral
+                            });
+                            return;
+                        }
                         await api.interactions.reply(interaction.id, interaction.token, {
-                            content: count?.count === count?.highscore ?
+                            content: count.count === count.highscore ?
                                 `🏆 The current count for this channel is **${count?.count || 0}** (current highscore!)` :
                                 `🔥 The current count for this channel is **${count?.count || 0}** with a highscore of **${count?.highscore || count?.count || 0}**.`,
                         });
