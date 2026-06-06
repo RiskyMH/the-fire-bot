@@ -28,13 +28,23 @@ export type IForceNick = {
 export const db = new SQL(process.env.DATABASE_URL || "sqlite://db.sqlite");
 
 export async function initDb() {
-  await db.unsafe("PRAGMA foreign_keys = ON; PRAGMA journal_mode = WAL; PRAGMA busy_timeout = 5000;").catch(() => { });
+  if (db.options.adapter === "sqlite") {
+    try {
+      await db`PRAGMA foreign_keys = ON;`;
+      await db`PRAGMA journal_mode = WAL;`;
+      await db`PRAGMA busy_timeout = 5000;`;
+      await db`PRAGMA wal_autocheckpoint = 1000;`;
+      await db`PRAGMA synchronous = NORMAL;`;
+    } catch (err) {
+      console.error("Failed to set PRAGMA settings:", err);
+    }
+  }
+
   await db`
     CREATE TABLE IF NOT EXISTS config (
       guild_id TEXT PRIMARY KEY
     );
-  `;
-  await db`
+
     CREATE TABLE IF NOT EXISTS counting (
       channel_id TEXT PRIMARY KEY,
       guild_id TEXT NOT NULL,
@@ -43,8 +53,7 @@ export async function initDb() {
       last_msg TEXT DEFAULT '{}',
       FOREIGN KEY (guild_id) REFERENCES config(guild_id) ON DELETE CASCADE
     );
-  `;
-  await db`
+
     CREATE TABLE IF NOT EXISTS timezone_user (
       guild_id TEXT NOT NULL,
       user_id TEXT NOT NULL,
@@ -52,31 +61,27 @@ export async function initDb() {
       PRIMARY KEY (guild_id, user_id),
       FOREIGN KEY (guild_id) REFERENCES config(guild_id) ON DELETE CASCADE
     );
-  `;
-  await db`
+
     CREATE TABLE IF NOT EXISTS timezone_message (
       guild_id TEXT PRIMARY KEY,
       channel_id TEXT NOT NULL,
       message_id TEXT NOT NULL,
       FOREIGN KEY (guild_id) REFERENCES config(guild_id) ON DELETE CASCADE
     );
-  `;
-  await db`
+
     CREATE TABLE IF NOT EXISTS member_actions (
       guild_id TEXT PRIMARY KEY,
       join_role_id TEXT,
       log_channel_id TEXT,
       FOREIGN KEY (guild_id) REFERENCES config(guild_id) ON DELETE CASCADE
     );
-  `;
-  await db`
+
     CREATE TABLE IF NOT EXISTS guild_tag (
       guild_id TEXT PRIMARY KEY,
       role_id TEXT,
       FOREIGN KEY (guild_id) REFERENCES config(guild_id) ON DELETE CASCADE
     );
-  `;
-  await db`
+
     CREATE TABLE IF NOT EXISTS force_nick (
       guild_id TEXT NOT NULL,
       user_id TEXT NOT NULL,
