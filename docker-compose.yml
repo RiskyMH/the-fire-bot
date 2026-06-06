@@ -11,6 +11,7 @@ services:
        DISCORD_TOKEN: ${DISCORD_TOKEN:?REQUIRED}
        NODE_ENV: production
        FORCE_COLOR: 1
+       BUN_JSC_forceRAMSize: 52428800 # 50MB
      volumes:
         - data:/data
      deploy:
