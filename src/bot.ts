@@ -44,7 +44,7 @@ client.on(GatewayDispatchEvents.GuildDelete, async ({ data: guild, api }) => {
 client.on(GatewayDispatchEvents.GuildMemberRemove, async ({ data: member, api }) => {
     if (!member.guild_id || !member.user?.id) return;
     await removeUserTimezone(member.guild_id, member.user.id);
-    await removeForceNick(member.guild_id, member.user.id);
+    // await removeForceNick(member.guild_id, member.user.id);
 
     const guildActions = await getGuildActions(member.guild_id);
     if (guildActions?.log_channel_id) {
