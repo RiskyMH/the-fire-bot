@@ -288,6 +288,9 @@ export async function setGuildTagRole(guild_id: string, role_id: string): Promis
 export async function removeGuildTagRole(guild_id: string): Promise<void> {
   await db`DELETE FROM guild_tag WHERE guild_id = ${guild_id}`;
 }
+export async function removeGuildTagRoleByRoleId(guild_id: string, role_id: string): Promise<void> {
+  await db`DELETE FROM guild_tag WHERE guild_id = ${guild_id} AND role_id = ${role_id}`;
+}
 
 export async function setForceNick(guild_id: string, user_id: string, forced_nick: string): Promise<void> {
   await ensureConfig(guild_id);
