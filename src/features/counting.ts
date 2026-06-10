@@ -162,7 +162,7 @@ const countingModule: EventModule = {
                                 style: TextInputStyle.Short,
                                 required: !!count,
                                 value: count ? count.count?.toLocaleString() || "0" : undefined,
-                                placeholder: "0"
+                                placeholder: count?.count?.toLocaleString() || "0"
                             }
                         },
                         {
@@ -177,6 +177,7 @@ const countingModule: EventModule = {
                                 style: TextInputStyle.Short,
                                 required: false,
                                 value: count?.highscore?.toLocaleString() || undefined,
+                                placeholder: count?.highscore?.toLocaleString() || "0"
                             }
                         },
                         count && {
@@ -197,7 +198,7 @@ const countingModule: EventModule = {
                 interaction.type === InteractionType.ModalSubmit &&
                 interaction.data.custom_id.startsWith("counting_modal:")
             ) {
-                const channelId = interaction.channel!.id;
+                const channelId = interaction.channel?.id;
                 if (!channelId) return;
 
                 let newCount = 0;
