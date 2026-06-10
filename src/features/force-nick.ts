@@ -1,4 +1,4 @@
-import { ApplicationCommandType, GatewayDispatchEvents, GuildMemberFlags, InteractionType, MessageFlags, PermissionFlagsBits } from "discord-api-types/v10";
+import { ApplicationCommandType, ComponentType, GatewayDispatchEvents, GuildMemberFlags, InteractionType, MessageFlags, PermissionFlagsBits, TextInputStyle, type APIModalInteractionResponseCallbackData } from "discord-api-types/v10";
 import type { EventModule } from "../feature.ts";
 import { getSubcommandAndOptions, hasBitfield, hasBitfield2 } from "../utils.ts";
 
@@ -25,33 +25,72 @@ const forceNickModule: EventModule = {
                 interaction.data.type === ApplicationCommandType.ChatInput &&
                 interaction.data.name === "force-nick"
             ) {
-                const { subcommand, options } = getSubcommandAndOptions(interaction.data);
-                const guildId = interaction.guild_id;
-                if (subcommand === "set") {
-                    const userId = options.user as string;
-                    const nickname = options.nickname as string;
-                    if (!userId || !nickname) {
-                        await api.interactions.reply(interaction.id, interaction.token, {
-                            content: `❌ You must specify a user and a nickname!`,
-                            flags: MessageFlags.Ephemeral
-                        });
-                        return;
+                const { options } = getSubcommandAndOptions(interaction.data);
+                const userId = options.user as string;
+                if (!hasBitfield2(interaction.app_permissions, PermissionFlagsBits.ManageNicknames)) {
+                    await api.interactions.reply(interaction.id, interaction.token, {
+                        content: `❌ I need Manage Nicknames permission to force nicknames!`,
+                        flags: MessageFlags.Ephemeral
+                    });
+                    return;
+                }
+                const member = interaction.data.resolved?.members?.[userId];
+                const user = interaction.data.resolved?.users?.[userId];
+                if (!member) {
+                    await api.interactions.reply(interaction.id, interaction.token, {
+                        content: `❌ The specified user is not in this server!`,
+                        flags: MessageFlags.Ephemeral
+                    });
+                    return;
+                }
+
+                const forcedNick = await db.getForceNick(interaction.guild_id, userId);
+
+                const modal: APIModalInteractionResponseCallbackData = {
+                    title: "Force Nickname",
+                    custom_id: `force_nick:${userId}`,
+                    components: [
+                        {
+                            type: ComponentType.TextDisplay,
+                            content: `Configure the forced nickname for <@${userId}>`
+                                + "\n-# - Any edits they do to this role will be reverted by the bot" +
+                                (forcedNick
+                                    ? `\n-# - Their current forced nickname is **${forcedNick}**` :
+                                    `\n-# - Their current username is **@${user?.username}**${member.nick ? ` (${member.nick})` : ""} and they don't have a forced nickname yet`
+                                )
+                        },
+                        {
+                            type: ComponentType.Label,
+                            label: "Nickname",
+                            description: "The nickname to force on the user. Leave blank to unset.",
+                            component: {
+                                type: ComponentType.TextInput,
+                                style: TextInputStyle.Short,
+                                custom_id: "nickname",
+                                required: false,
+                                min_length: 1,
+                                max_length: 32,
+                                value: forcedNick ?? undefined,
+                            }
+                        }
+                    ]
+                }
+                await api.interactions.createModal(interaction.id, interaction.token, modal);
+            } else if (interaction.type === InteractionType.ModalSubmit && interaction.data.custom_id.startsWith("force_nick:")) {
+                const userId = interaction.data.custom_id.split(":")[1]!;
+                const guildId = interaction.guild_id!;
+                let nickname: string | null = null;
+
+                for (const component of interaction.data.components) {
+                    if (component.type === ComponentType.Label && component.component.custom_id === "nickname") {
+                        const nicknameInput = component.component;
+                        if (nicknameInput.type === ComponentType.TextInput) {
+                            nickname = nicknameInput.value.trim() || null;
+                        }
                     }
-                    if (!hasBitfield2(interaction.app_permissions, PermissionFlagsBits.ManageNicknames)) {
-                        await api.interactions.reply(interaction.id, interaction.token, {
-                            content: `❌ I need Manage Nicknames permission to force nicknames!`,
-                            flags: MessageFlags.Ephemeral
-                        });
-                        return;
-                    }
-                    const member = interaction.data.resolved?.members?.[userId];
-                    if (!member) {
-                        await api.interactions.reply(interaction.id, interaction.token, {
-                            content: `❌ The specified user is not in this server!`,
-                            flags: MessageFlags.Ephemeral
-                        });
-                        return;
-                    }
+                }
+
+                if (nickname) {
                     try {
                         await api.guilds.editMember(guildId, userId, { nick: nickname }, { reason: "force-nick set" });
                     } catch (err) {
@@ -61,54 +100,34 @@ const forceNickModule: EventModule = {
                         });
                         return;
                     }
+
                     await db.setForceNick(guildId, userId, nickname);
                     await api.interactions.reply(interaction.id, interaction.token, {
                         content: `✅ <@${userId}> will now be forced to have the nickname **${nickname}**.`,
                         allowed_mentions: {}
                     });
-                } else if (subcommand === "unset") {
-                    const userId = options.user as string;
-                    if (!userId) {
-                        await api.interactions.reply(interaction.id, interaction.token, {
-                            content: `❌ You must specify a user!`,
-                            flags: MessageFlags.Ephemeral
-                        });
-                        return;
-                    }
-                    const removed = await db.removeForceNick(guildId, userId);
-                    if (removed) {
-                        await api.interactions.reply(interaction.id, interaction.token, {
-                            content: `🗑️ <@${userId}> no longer has a forced nickname.`,
-                            allowed_mentions: {}
-                        });
-                    } else {
-                        await api.interactions.reply(interaction.id, interaction.token, {
-                            content: `ℹ️ <@${userId}> didn't have a forced nickname.`,
-                            allowed_mentions: {}
-                        });
-                    }
-                } else if (subcommand === "view") {
-                    const nicks = await db.getGuildForceNicks(guildId);
-                    if (nicks.length === 0) {
-                        await api.interactions.reply(interaction.id, interaction.token, {
-                            content: `ℹ️ No users have forced nicknames in this server.`,
-                            flags: MessageFlags.Ephemeral
-                        });
-                        return;
-                    }
-                    const lines = nicks.map(n => `- <@${n.user_id}> → **${n.forced_nick}**`);
+                    return;
+                }
+
+                const removed = await db.removeForceNick(guildId, userId);
+                if (removed) {
                     await api.interactions.reply(interaction.id, interaction.token, {
-                        content: `**Forced Nicknames:**\n${lines.join("\n")}`,
+                        content: `🗑️ <@${userId}> no longer has a forced nickname.`,
                         allowed_mentions: {}
                     });
-                } else if (subcommand === "resetall") {
-                    const count = await db.removeAllForceNicks(guildId);
+                    try {
+                        await api.guilds.editMember(guildId, userId, { nick: null }, { reason: "force-nick unset" });
+                    } catch (err) {
+                        console.error(`Failed to reset nick for user: ${err}`);
+                    }
+                } else {
                     await api.interactions.reply(interaction.id, interaction.token, {
-                        content: `🗑️ Removed forced nicknames from **${count}** user${count === 1 ? '' : 's'}.`,
-                        allowed_mentions: {}
+                        content: `ℹ️ <@${userId}> didn't have a forced nickname.`,
+                        flags: MessageFlags.Ephemeral,
                     });
                 }
             }
+
         },
     },
 };

@@ -143,7 +143,7 @@ const timezoneModule: EventModule = {
                         const result = await generateTimezoneMessage(db, guildId, null, commandIds);;
                         if (!result) {
                             await api.interactions.reply(interaction.id, interaction.token, {
-                                content: `ℹ️ No members in this server have set a timezone yet! Use "/timezone set" to get started.`,
+                                content: `ℹ️ No members in this server have set a timezone yet! Use ${commandIds?.['timezone set'] ? `</${commandIds['timezone set']}>` : '"/timezone set"'} to get started.`,
                                 flags: MessageFlags.Ephemeral
                             });
                             return;

@@ -1,6 +1,6 @@
-import { ApplicationCommandType, GatewayDispatchEvents, InteractionType, MessageFlags } from "discord-api-types/v10";
+import { ApplicationCommandType, ComponentType, GatewayDispatchEvents, InteractionType, MessageFlags, TextInputStyle, type APIModalInteractionResponseCallbackComponent, type APIModalInteractionResponseCallbackData } from "discord-api-types/v10";
 import type { EventModule } from "../feature";
-import { getCounting } from "../db";
+import { getCounting, type ICounting } from "../db";
 import { getSubcommandAndOptions } from "../utils";
 
 const useCustomEmoji = true;
@@ -135,44 +135,109 @@ const countingModule: EventModule = {
             if (!interaction.guild_id) return;
             if (
                 interaction.type === InteractionType.ApplicationCommand &&
-                interaction.data.type === ApplicationCommandType.ChatInput && 
+                interaction.data.type === ApplicationCommandType.ChatInput &&
                 interaction.data.name === "counting"
             ) {
-                const { subcommand, options } = getSubcommandAndOptions(interaction.data);
-                const channelId = interaction.channel.id;
-                const guildId = interaction.guild_id;
-                if (subcommand === "set") {
-                    const start = Number(options.start) || 0;
-                    const highscore = Number(options.highscore) || start || 0;
-                    await db.setCounting(channelId, guildId, start, highscore, undefined);
+                const count = await db.getCounting(interaction.channel.id);
+
+                const modal: APIModalInteractionResponseCallbackData = {
+                    title: "Counting",
+                    custom_id: `counting_modal:${interaction.channel.id}`,
+                    components: ([
+                        {
+                            type: ComponentType.TextDisplay,
+                            content: `Configure the counting channel <#${interaction.channel.id}>:\n` + (count
+                                ? `-# The current count is **${count?.count.toLocaleString()}** with a high score of **${count?.highscore?.toLocaleString() || count?.count.toLocaleString()}**.`
+                                : `-# This channel is not a counting channel yet. Use the form below to set it up!`)
+                        },
+                        {
+                            type: ComponentType.Label,
+                            label: "Current Count",
+                            description: "Set the current count for this counting channel",
+                            component: {
+                                type: ComponentType.TextInput,
+                                custom_id: "current_count",
+                                max_length: 10,
+                                min_length: 1,
+                                style: TextInputStyle.Short,
+                                required: !!count,
+                                value: count ? count.count?.toLocaleString() || "0" : undefined,
+                                placeholder: "0"
+                            }
+                        },
+                        {
+                            type: ComponentType.Label,
+                            label: "High Score",
+                            description: "Set the high score for this counting channel",
+                            component: {
+                                type: ComponentType.TextInput,
+                                custom_id: "high_score",
+                                max_length: 10,
+                                min_length: 1,
+                                style: TextInputStyle.Short,
+                                required: false,
+                                value: count?.highscore?.toLocaleString() || undefined,
+                            }
+                        },
+                        count && {
+                            type: ComponentType.Label,
+                            label: "Disable Counting",
+                            description: "If enabled, the bot will stop counting and reset the data.",
+                            component: {
+                                type: ComponentType.Checkbox,
+                                custom_id: "reset_messages",
+                                default: false
+                            },
+                        },
+                    ] satisfies (APIModalInteractionResponseCallbackComponent | false | null)[]).filter(e => !!e)
+                };
+                await api.interactions.createModal(interaction.id, interaction.token, modal);
+
+            } else if (
+                interaction.type === InteractionType.ModalSubmit &&
+                interaction.data.custom_id.startsWith("counting_modal:")
+            ) {
+                const channelId = interaction.channel!.id;
+                if (!channelId) return;
+
+                let newCount = 0;
+                let newHighScore = 0;
+                let resetMessages = false;
+
+                for (const label of interaction.data.components) {
+                    if (label.type !== ComponentType.Label) continue;
+                    const c = (label).component ?? label;
+                    if (!c) continue;
+                    if (c.type === ComponentType.TextInput) {
+                        if (c.custom_id === "current_count" && c.value) newCount = Number(c.value.replaceAll(',', ''));
+                        if (c.custom_id === "high_score" && c.value) newHighScore = Number(c.value.replaceAll(',', ''));
+                    } else if (c.type === ComponentType.Checkbox) {
+                        if (c.custom_id === "reset_messages") resetMessages = c.value;
+                    }
+                }
+
+                if (isNaN(newCount) || isNaN(newHighScore)) {
                     await api.interactions.reply(interaction.id, interaction.token, {
-                        content: `✅ This channel is now a counting channel starting at **${start + 1}**!`,
+                        content: `❌ Please enter valid numbers for count and high score.`,
+                        flags: MessageFlags.Ephemeral
                     });
-                } else if (subcommand === "unset") {
+                    return;
+                }
+
+                if (resetMessages) {
                     await db.unsetCounting(channelId);
                     await api.interactions.reply(interaction.id, interaction.token, {
-                        content: `🚫 This channel is no longer a counting channel.`,
+                        content: `🚫 Counting has been disabled for this channel and all data has been reset.`,
+                        flags: MessageFlags.Ephemeral
                     });
-                } else if (subcommand === "reset") {
-                    await db.resetCounting(channelId, 0);
-                    await api.interactions.reply(interaction.id, interaction.token, {
-                        content: `🔄 The count for this channel has been reset to **0**.`,
-                    });
-                } else if (subcommand === "view") {
-                    const count = await db.getCounting(channelId);
-                    if (!count) {
-                        await api.interactions.reply(interaction.id, interaction.token, {
-                            content: `ℹ️ This channel is not a counting channel yet. Use </counting set:${commandIds.counting}> to set it up!`,
-                            flags: MessageFlags.Ephemeral
-                        });
-                        return;
-                    }
-                    await api.interactions.reply(interaction.id, interaction.token, {
-                        content: count.count === count.highscore ?
-                            `🏆 The current count for this channel is **${count?.count || 0}** (current highscore!)` :
-                            `🔥 The current count for this channel is **${count?.count || 0}** with a highscore of **${count?.highscore || count?.count || 0}**.`,
-                    });
+                    return;
                 }
+
+                await db.setCounting(channelId, interaction.guild_id, newCount, Math.max(newHighScore, newCount), undefined);
+                await api.interactions.reply(interaction.id, interaction.token, {
+                    content: `✅ Counting has been updated for this channel! The current count is now **${newCount.toLocaleString()}** with a high score of **${newHighScore.toLocaleString()}**.`,
+                    allowed_mentions: {},
+                });
             }
         },
     },
