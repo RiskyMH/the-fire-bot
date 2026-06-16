@@ -5,7 +5,7 @@ import { getFocusedAutoCompleteOption, getSubcommandAndOptions, hasBitfield, tri
 import { getTimeZones, type Timezone } from "../timezones" with {type: "macro"};
 import type { API } from "@discordjs/core";
 const _timezones = getTimeZones();
-const getTimezones = () => _timezones;
+const timezones = _timezones;
 
 const timezoneModule: EventModule = {
     name: "timezone",
@@ -209,7 +209,7 @@ async function generateTimezoneMessage(db: typeof import("../db.ts"), guildId: s
             return a.user_id.length - b.user_id.length;
         })
         .reduce((acc: ({ localTime: string, offsetStr: string, user_ids: string[], offsetNum: number })[], r) => {
-            const canonical = getTimezones().find(e => e.name === r.timezone);
+            const canonical = timezones.find(e => e.name === r.timezone);
             if (!canonical) return acc;
 
             let localTime = "?";
@@ -268,7 +268,7 @@ async function updateExistingTimezoneMessage(api: API, db: typeof import("../db.
 function findTimezoneMatch(z: string): Timezone | undefined {
     if (!z) return undefined;
     const input = String(z).trim().toLowerCase();
-    const exact = getTimezones().find(tz =>
+    const exact = timezones.find(tz =>
         tz.name.toLowerCase() === input
     );
     if (exact) return exact;
@@ -278,7 +278,7 @@ function findTimezoneMatch(z: string): Timezone | undefined {
 function searchTimezones(query: string): Timezone[] {
     const input = String(query).trim().toLowerCase();
     // todo make this smarter and somehow make some give more search ranging like name === query is instant match but others less so
-    return getTimezones().filter(tz =>
+    return timezones.filter(tz =>
         tz.name.toLowerCase().includes(input) ||
         tz.displayName.toLowerCase().includes(input) ||
         tz.abbr.toLowerCase().includes(input) ||
