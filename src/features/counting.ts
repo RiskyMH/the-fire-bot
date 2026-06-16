@@ -126,9 +126,7 @@ const countingModule: EventModule = {
             });
         },
         [GatewayDispatchEvents.ChannelDelete]: async ({ data: channel, api, db }) => {
-            // @ts-expect-error - somehow the types are broken for channel*
             if (!channel.guild_id || !channel.id) return;
-            // @ts-expect-error - somehow the types are broken for channel*
             await db.removeCountingByChannelId(channel.guild_id, channel.id);
         },
         [GatewayDispatchEvents.InteractionCreate]: async ({ data: interaction, api, db, commandIds }) => {

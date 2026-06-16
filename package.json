@@ -13,17 +13,14 @@
     "docker:logs": "docker compose logs -f"
   },
   "devDependencies": {
-    "@types/bun": "^1.3.10",
+    "@types/bun": "^1.3.14",
     "typescript": "^5.9.3"
   },
   "dependencies": {
-    "@discordjs/core": "^2.4.0",
-    "@discordjs/rest": "^2.6.0",
-    "@discordjs/ws": "^2.0.4",
+    "@discordjs/core": "3.0.0-dev.1781396633-c6c78868c",
+    "@discordjs/rest": "3.0.0-dev.1781396633-c6c78868c",
+    "@discordjs/ws": "3.0.0-dev.1781396633-c6c78868c",
     "@vvo/tzdb": "^6.198.0",
-    "discord-api-types": "^0.38.41"
-  },
-  "overrides": {
-    "discord-api-types": "^0.38.41"
+    "discord-api-types": "^0.38.48"
   }
 }

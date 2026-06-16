@@ -9,9 +9,7 @@ const guildActionsModule: EventModule = {
             await db.removeGuildActionsRoleByRoleId(role.guild_id, role.role_id);
         },
         [GatewayDispatchEvents.ChannelDelete]: async ({ data: channel, api, db }) => {
-            // @ts-expect-error - somehow the types are broken for channel*
             if (!channel.guild_id || !channel.id) return;
-            // @ts-expect-error - somehow the types are broken for channel*
             await db.removeGuildActionsLogByChannelId(channel.guild_id, channel.id);
         },
         [GatewayDispatchEvents.GuildMemberAdd]: async ({ data: member, api, db }) => {

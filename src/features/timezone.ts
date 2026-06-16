@@ -27,9 +27,7 @@ const timezoneModule: EventModule = {
             await db.removeUserTimezone(member.guild_id, member.user.id);
         },
         [GatewayDispatchEvents.ChannelDelete]: async ({ data: channel, api, db }) => {
-            // @ts-expect-error - somehow the types are broken for channel*
             if (!channel.guild_id || !channel.id) return;
-            // @ts-expect-error - somehow the types are broken for channel*
             await db.removeGuildTimezoneMessageByChannelId(channel.guild_id, channel.id);
         },
         [GatewayDispatchEvents.InteractionCreate]: async ({ data: interaction, api, db, commandIds }) => {
