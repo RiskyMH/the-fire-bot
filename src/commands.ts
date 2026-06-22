@@ -47,6 +47,25 @@ export const commands = [
                 ]
 
             },
+            {
+                type: ApplicationCommandOptionType.Subcommand,
+                name: "compare",
+                description: "Compare another user's timezone with yours or another user",
+                options: [
+                    {
+                        type: ApplicationCommandOptionType.User,
+                        name: "user",
+                        description: "The user whose timezone to compare",
+                        required: true,
+                    },
+                    {
+                        type: ApplicationCommandOptionType.User,
+                        name: "user2",
+                        description: "Compare against a different user (defaults to you)",
+                        required: false,
+                    },
+                ]
+            },
         ],
         integration_types: [ApplicationIntegrationType.GuildInstall],
         contexts: [InteractionContextType.Guild],

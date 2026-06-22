@@ -135,6 +135,81 @@ const timezoneModule: EventModule = {
                             allowed_mentions: {},
                         });
                     }
+                    else if (subcommand === "compare") {
+                        const requesterId = interaction.member!.user.id;
+                        const userId1 = options.user as string;
+                        const userId2: string = typeof options.user2 === 'string' ? options.user2 : requesterId;
+
+                        const guildId = interaction.guild_id;
+                        if (!guildId) {
+                            await api.interactions.reply(interaction.id, interaction.token, {
+                                content: `❌ This command can only be used in a server.`,
+                                flags: MessageFlags.Ephemeral
+                            });
+                            return;
+                        }
+
+                        const tz1 = await db.getUserTimezone(guildId, userId1);
+                        if (!tz1) {
+                            const mention = commandIds?.['timezone set'] ? `</timezone set:${commandIds['timezone set']}>` : '"/timezone set"';
+                            await api.interactions.reply(interaction.id, interaction.token, {
+                                content: `ℹ️ <@${userId1}> doesn't have a timezone set yet! They should use ${mention} to get started.`,
+                                flags: MessageFlags.Ephemeral
+                            });
+                            return;
+                        }
+
+                        const tz2 = await db.getUserTimezone(guildId, userId2);
+                        if (!tz2) {
+                            const mention = commandIds?.['timezone set'] ? `</timezone set:${commandIds['timezone set']}>` : '"/timezone set"';
+                            const isSelf = userId2 === requesterId;
+                            await api.interactions.reply(interaction.id, interaction.token, {
+                                content: `ℹ️ ${isSelf ? "You haven't" : `<@${userId2}> hasn't`} set a timezone yet! ${isSelf ? "You" : "They"} should use ${mention} to get started.`,
+                                flags: MessageFlags.Ephemeral
+                            });
+                            return;
+                        }
+
+                        const match1 = timezones.find(tz => tz.name === tz1);
+                        const match2 = timezones.find(tz => tz.name === tz2);
+                        if (!match1 || !match2) return;
+
+                        const now = Date.now();
+                        const fmtTime = (tz: Timezone) => {
+                            const time = new Intl.DateTimeFormat('en-US', { hour: 'numeric', minute: '2-digit', hour12: true, timeZone: tz.name }).format(now);
+                            const offsetStr = new Intl.DateTimeFormat('en-US', { timeZone: tz.name, timeZoneName: 'shortOffset' }).formatToParts(now).find(p => p.type === 'timeZoneName')?.value || '';
+                            const offsetMatch = offsetStr.match(/([+-])(\d+)(?::(\d+))?/);
+                            const offsetNum = offsetMatch
+                                ? parseInt(offsetMatch[1]! + offsetMatch[2]!) + (parseInt(offsetMatch[3] ?? "0") / 60)
+                                : tz.offset;
+                            return { time, offsetStr, offsetNum };
+                        };
+
+                        const r1 = fmtTime(match1);
+                        const r2 = fmtTime(match2);
+
+                        const diffMinutes = Math.round((r2.offsetNum - r1.offsetNum) * 60);
+                        const absDiff = Math.abs(diffMinutes);
+                        const diffHours = Math.floor(absDiff / 60);
+                        const diffMins = absDiff % 60;
+                        const diffStr = diffMinutes === 0
+                            ? "the same time"
+                            : `**${diffHours > 0 ? `${diffHours} hour${diffHours > 1 ? "s" : ""}` : ""}${diffHours > 0 && diffMins > 0 ? " and " : ""}${diffMins > 0 ? `${diffMins} minute${diffMins > 1 ? "s" : ""}` : ""} ${diffMinutes > 0 ? "ahead" : "behind"}**`;
+
+                        const label1 = match1.abbr && match1.abbr !== offsetToString(match1.offset) ? ` ${match1.abbr}` : "";
+                        const label2 = match2.abbr && match2.abbr !== offsetToString(match2.offset) ? ` ${match2.abbr}` : "";
+                        const content = [
+                            `### Timezone Comparison`,
+                            `**<@${userId1}>** — ${match1.displayName} · \`${r1.time}\`${label1} (${r1.offsetStr.replace("GMT", "")})`,
+                            `**<@${userId2}>** — ${match2.displayName} · \`${r2.time}\`${label2} (${r2.offsetStr.replace("GMT", "")})`,
+                            `-# Time difference: ${diffStr}`
+                        ].join("\n");
+
+                        await api.interactions.reply(interaction.id, interaction.token, {
+                            content,
+                            allowed_mentions: {},
+                        });
+                    }
                 } else if (interaction.data.name === "updating-timezone-message") {
                     const guildId = interaction.guild_id;
                     try {
