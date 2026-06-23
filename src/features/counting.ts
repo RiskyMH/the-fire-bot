@@ -1,7 +1,7 @@
-import { ApplicationCommandType, ComponentType, GatewayDispatchEvents, InteractionType, MessageFlags, TextInputStyle, type APIModalInteractionResponseCallbackComponent, type APIModalInteractionResponseCallbackData } from "discord-api-types/v10";
+import { ApplicationCommandType, ComponentType, GatewayDispatchEvents, InteractionType, MessageFlags, PermissionFlagsBits, TextInputStyle, type APIModalInteractionResponseCallbackComponent, type APIModalInteractionResponseCallbackData } from "discord-api-types/v10";
 import type { EventModule } from "../feature";
-import { getCounting, type ICounting } from "../db";
-import { getSubcommandAndOptions } from "../utils";
+import { getCounting } from "../db";
+import { hasBitfield2 } from "../utils";
 
 const useCustomEmoji = true;
 
@@ -136,6 +136,15 @@ const countingModule: EventModule = {
                 interaction.data.type === ApplicationCommandType.ChatInput &&
                 interaction.data.name === "counting"
             ) {
+                const requiredPerms = PermissionFlagsBits.ViewChannel | PermissionFlagsBits.SendMessages | PermissionFlagsBits.AddReactions | PermissionFlagsBits.UseExternalEmojis;
+                if (!hasBitfield2(interaction.app_permissions, requiredPerms)) {
+                    await api.interactions.reply(interaction.id, interaction.token, {
+                        content: `❌ I need the following permissions to effectively make this a couting channel:\n` +
+                            "-# View Channel, Send Messages, Add Reactions, Use External Emojis"
+                    });
+                    return;
+                }
+
                 const count = await db.getCounting(interaction.channel.id);
 
                 const modal: APIModalInteractionResponseCallbackData = {
