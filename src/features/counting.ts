@@ -28,7 +28,7 @@ const countingModule: EventModule = {
             // Respond to cheaty emojis
             if (message.content?.includes('☑️') || message.content?.includes('✅')) {
                 // hopefully be cheaty only after the normal tick reaction is added
-                setTimeout(api.channels.addMessageReaction.bind(null, message.channel_id, message.id, '🤨'), 200);
+                setTimeout(api.channels.addMessageReaction.bind(null, message.channel_id, message.id, '🤨'), 100);
                 // intentionally not breaking here so that it also checks the number but still reacts with the cheaty emoji
             }
 
@@ -155,7 +155,7 @@ const countingModule: EventModule = {
                             component: {
                                 type: ComponentType.TextInput,
                                 custom_id: "current_count",
-                                max_length: 10,
+                                max_length: Math.max(10, count?.count?.toString().length || 0),
                                 min_length: 1,
                                 style: TextInputStyle.Short,
                                 required: !!count,
@@ -170,7 +170,7 @@ const countingModule: EventModule = {
                             component: {
                                 type: ComponentType.TextInput,
                                 custom_id: "high_score",
-                                max_length: 10,
+                                max_length: Math.max(10, count?.highscore?.toString().length || 0),
                                 min_length: 1,
                                 style: TextInputStyle.Short,
                                 required: false,
@@ -208,8 +208,8 @@ const countingModule: EventModule = {
                     const c = (label).component ?? label;
                     if (!c) continue;
                     if (c.type === ComponentType.TextInput) {
-                        if (c.custom_id === "current_count" && c.value) newCount = Number(c.value.replaceAll(',', ''));
-                        if (c.custom_id === "high_score" && c.value) newHighScore = Number(c.value.replaceAll(',', ''));
+                        if (c.custom_id === "current_count" && c.value) newCount = parseInt(c.value.replaceAll(',', ''));
+                        if (c.custom_id === "high_score" && c.value) newHighScore = parseInt(c.value.replaceAll(',', ''));
                     } else if (c.type === ComponentType.Checkbox) {
                         if (c.custom_id === "reset_messages") resetMessages = c.value;
                     }
