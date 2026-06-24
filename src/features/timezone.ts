@@ -202,7 +202,10 @@ const timezoneModule: EventModule = {
                             `### Timezone Comparison`,
                             `**<@${userId1}>** — ${match1.displayName} · \`${r1.time}\`${label1} (${r1.offsetStr.replace("GMT", "")})`,
                             `**<@${userId2}>** — ${match2.displayName} · \`${r2.time}\`${label2} (${r2.offsetStr.replace("GMT", "")})`,
-                            `-# Time difference: ${diffStr}`
+                            `-# Time difference: ${diffMinutes === 0 ? "*none*"
+                                : userId2 === requesterId ? `*you* are ${diffStr}`
+                                    : `<@${userId2}> is ${diffStr}`
+                            }`
                         ].join("\n");
 
                         await api.interactions.reply(interaction.id, interaction.token, {
