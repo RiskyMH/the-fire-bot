@@ -68,7 +68,7 @@ Keeping these simple as they're pretty much common sense:
                         {
                             type: ComponentType.TextDisplay,
                             content: `## What is this server\n
-This server is mainly for stuff related to <:Fire:1281081113338450012> [Me](https://riskymh.dev); which mainly is my email site <:EmailThing:1226746122895097916> [**EmailThing**](https://emailthing.app/home) and my Discord bot <:honeypot:1452856668202467481> [**Honeypot**](https://discord.com/oauth2/authorize?client_id=1450060292716494940).`,
+This server is mainly for stuff related to <:Fire:1281081113338450012> [Me](https://riskymh.dev); which mainly is my email site <:EmailThing:1226746122895097916> [**EmailThing**](https://emailthing.app/home) and my Discord bot <:honeypot:1452856668202467481> [**Honeypot**](https://honeypot.riskymh.dev).`,
                         },
                         {
                             type: ComponentType.TextDisplay,
@@ -115,7 +115,7 @@ This server is mainly for stuff related to <:Fire:1281081113338450012> [Me](http
                     type: ComponentType.Button,
                     label: "Honeypot",
                     style: ButtonStyle.Link,
-                    url: "https://discord.com/oauth2/authorize?client_id=1450060292716494940",
+                    url: "https://honeypot.riskymh.dev",
                     emoji: {
                         id: "1452856668202467481",
                         name: "honeypot"

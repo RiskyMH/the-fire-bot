@@ -109,22 +109,15 @@ const forceNickModule: EventModule = {
                     return;
                 }
 
-                const removed = await db.removeForceNick(guildId, userId);
-                if (removed) {
-                    await api.interactions.reply(interaction.id, interaction.token, {
-                        content: `🗑️ <@${userId}> no longer has a forced nickname.`,
-                        allowed_mentions: {}
-                    });
-                    try {
-                        await api.guilds.editMember(guildId, userId, { nick: null }, { reason: "force-nick unset" });
-                    } catch (err) {
-                        console.error(`Failed to reset nick for user: ${err}`);
-                    }
-                } else {
-                    await api.interactions.reply(interaction.id, interaction.token, {
-                        content: `ℹ️ <@${userId}> didn't have a forced nickname.`,
-                        flags: MessageFlags.Ephemeral,
-                    });
+                await db.removeForceNick(guildId, userId);
+                await api.interactions.reply(interaction.id, interaction.token, {
+                    content: `🗑️ <@${userId}> no longer has a forced nickname.`,
+                    allowed_mentions: {}
+                });
+                try {
+                    await api.guilds.editMember(guildId, userId, { nick: null }, { reason: "force-nick unset" });
+                } catch (err) {
+                    console.error(`Failed to reset nick for user: ${err}`);
                 }
             }
 

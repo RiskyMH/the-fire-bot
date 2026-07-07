@@ -302,9 +302,8 @@ export async function setForceNick(guild_id: string, user_id: string, forced_nic
   `;
 }
 
-export async function removeForceNick(guild_id: string, user_id: string): Promise<boolean> {
+export async function removeForceNick(guild_id: string, user_id: string) {
   const result = await db`DELETE FROM force_nick WHERE guild_id = ${guild_id} AND user_id = ${user_id}`;
-  return result.changes && result.changes > 0;
 }
 
 export async function getForceNick(guild_id: string, user_id: string): Promise<string | null> {
