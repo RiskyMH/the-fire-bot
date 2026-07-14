@@ -24,36 +24,34 @@ Also join the <#1463533547800498301> chain and setup your timezone with \`/timez
             // accent_color: 0xfee75c,
             // accent_color: 0xFF6723,
             components: [
-                {
-                    type: ComponentType.Section,
-                    components: [
-                        {
-                            type: ComponentType.TextDisplay,
-                            content: `## Rules
-Keeping these simple as they're pretty much common sense:
-1. **No offensive messages or nicknames** - Anything that a reasonable person might find offensive.
-2. **No spam** - This includes but is not limited too, loud/obnoxious noises in voice, @mention spam, character spam, image spam, and message spam.
-3. **No Gorey, Sexual, or scary content** - Screamer links, porn, nudity, death.
-4. **No harassment** - Including sexual harassment or encouraging of harassment.
-5. **No self or user bots** - These are in some cases against the discord TOS and if you need a bot then use the allowed *user-installable bots* or one in the server.
-6. **[Follow Discord ToS](https://discord.com/terms)**`
-                        }
-                    ],
-                    accessory: {
-                        type: ComponentType.Button,
-                        url: "https://discord.com/guidelines",
-                        // label: "Discord Guidelines",
-                        emoji: {
-                            id: "1325885166631125102",
-                            name: "discord_wumpus"
-                        },
-                        style: ButtonStyle.Link,
-                    }
-                },
+                // {
+                //     type: ComponentType.Section,
+                //     components: [
                 {
                     type: ComponentType.TextDisplay,
-                    content: `-# There may be situations not covered by the rules or times where the rule may not fit the situation, so hopefully common sense will prevail.`,
+                    content: `## Server Rules
+1. Use English
+2. Be respectful towards other people
+3. Self-doxing are discouraged to protect safety and comfort of community
+4. No spamming or advertisement in places that are not intended for its purposes
+5. No harrasment or encouragement to harass anyone
+6. No NSFW and illegal content including but not limited to porn, gore, suicide content, and other contents that could put others at risk
+7. No self-bots or automated user accounts
+8. Respect moderator decisions. Do not evade or circumvent moderation actions
+-# We expect you to follow the rules above in addition to [Discord's ToS](https://discord.com/terms) and [Guidelines](https://discord.com/guidelines)`
                 }
+                // ],
+                //     accessory: {
+                //         type: ComponentType.Button,
+                //         url: "https://discord.com/guidelines",
+                //         // label: "Discord Guidelines",
+                //         emoji: {
+                //             id: "1325885166631125102",
+                //             name: "discord_wumpus"
+                //         },
+                //         style: ButtonStyle.Link,
+                //     }
+                // },
             ]
         },
 
@@ -68,7 +66,7 @@ Keeping these simple as they're pretty much common sense:
                         {
                             type: ComponentType.TextDisplay,
                             content: `## What is this server\n
-This server is mainly for stuff related to <:Fire:1281081113338450012> [Me](https://riskymh.dev); which mainly is my email site <:EmailThing:1226746122895097916> [**EmailThing**](https://emailthing.app/home) and my Discord bot <:honeypot:1452856668202467481> [**Honeypot**](https://honeypot.riskymh.dev).`,
+This server is mainly for stuff related to <:Fire:1281081113338450012> [Me](https://riskymh.dev); which mainly is my popular Discord bot <:honeypot:1452856668202467481> [**Honeypot**](https://honeypot.riskymh.dev) and other things like my email site <:EmailThing:1226746122895097916> [**EmailThing**](https://emailthing.app/home).`,
                         },
                         {
                             type: ComponentType.TextDisplay,
@@ -84,7 +82,7 @@ This server is mainly for stuff related to <:Fire:1281081113338450012> [Me](http
                 },
                 {
                     type: ComponentType.TextDisplay,
-                    content: `-# Learn more about the respective projects in <#1206711313766682664> and <#894713013762928670>!`,
+                    content: `-# Learn more about my stuff in https://discord.com/channels/894705593087049729/894707437653868565/959320056431513650 and on my website [riskymh.dev](https://riskymh.dev)!`,
                 },
             ]
         },
@@ -103,22 +101,22 @@ This server is mainly for stuff related to <:Fire:1281081113338450012> [Me](http
                 },
                 {
                     type: ComponentType.Button,
-                    label: "EmailThing",
-                    style: ButtonStyle.Link,
-                    url: "https://emailthing.app",
-                    emoji: {
-                        id: "1226746122895097916",
-                        name: "EmailThing"
-                    }
-                },
-                {
-                    type: ComponentType.Button,
                     label: "Honeypot",
                     style: ButtonStyle.Link,
                     url: "https://honeypot.riskymh.dev",
                     emoji: {
                         id: "1452856668202467481",
                         name: "honeypot"
+                    }
+                },
+                {
+                    type: ComponentType.Button,
+                    label: "EmailThing",
+                    style: ButtonStyle.Link,
+                    url: "https://emailthing.app",
+                    emoji: {
+                        id: "1226746122895097916",
+                        name: "EmailThing"
                     }
                 },
             ],
@@ -128,10 +126,15 @@ This server is mainly for stuff related to <:Fire:1281081113338450012> [Me](http
     embeds: [],
 }
 
-await fetch(process.env.WEBHOOK_URL! + "?wait=true&with_components=true", {
+const res = await fetch(process.env.WEBHOOK_URL! + "?wait=true&with_components=true", {
     method: process.env.WEBHOOK_URL?.includes("/messages/") ? "PATCH" : "POST",
     headers: {
         "Content-Type": "application/json",
     },
     body: JSON.stringify(body),
 })
+
+if (!res.ok) {
+    console.error(`Failed to send webhook: ${res.status} ${res.statusText}`);
+    console.log(await res.text());
+}
