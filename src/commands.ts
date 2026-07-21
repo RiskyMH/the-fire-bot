@@ -111,4 +111,12 @@ export const commands = [
         integration_types: [ApplicationIntegrationType.GuildInstall],
         contexts: [InteractionContextType.Guild],
     },
+    {
+        name: "vc-role",
+        description: "Automatically give a role when users are in a voice channel",
+        type: ApplicationCommandType.ChatInput,
+        default_member_permissions: PermissionFlagsBits.ManageRoles.toString(),
+        integration_types: [ApplicationIntegrationType.GuildInstall],
+        contexts: [InteractionContextType.Guild],
+    },
 ] satisfies RESTPutAPIApplicationCommandsJSONBody;

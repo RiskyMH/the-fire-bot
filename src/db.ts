@@ -24,6 +24,10 @@ export type IForceNick = {
   user_id: string;
   forced_nick: string;
 }
+export type IVcRole = {
+  guild_id: string;
+  role_id: string;
+}
 
 export const db = new SQL(process.env.DATABASE_URL || "sqlite://db.sqlite");
 
@@ -89,6 +93,12 @@ export async function initDb() {
       PRIMARY KEY (guild_id, user_id),
       FOREIGN KEY (guild_id) REFERENCES config(guild_id) ON DELETE CASCADE
     );
+
+    CREATE TABLE IF NOT EXISTS vc_role (
+      guild_id TEXT PRIMARY KEY,
+      role_id TEXT NOT NULL,
+      FOREIGN KEY (guild_id) REFERENCES config(guild_id) ON DELETE CASCADE
+    );
   `;
 }
 
@@ -100,6 +110,7 @@ export async function removeGuild(guild_id: string): Promise<void> {
   await db`DELETE FROM member_actions WHERE guild_id = ${guild_id}`;
   await db`DELETE FROM guild_tag WHERE guild_id = ${guild_id}`;
   await db`DELETE FROM force_nick WHERE guild_id = ${guild_id}`;
+  await db`DELETE FROM vc_role WHERE guild_id = ${guild_id}`;
 }
 
 export async function ensureConfig(guild_id: string): Promise<void> {
@@ -323,4 +334,27 @@ export async function removeUserForceNicksEverywhere(user_id: string): Promise<v
 export async function removeAllForceNicks(guild_id: string): Promise<number> {
   const result = await db`DELETE FROM force_nick WHERE guild_id = ${guild_id}`;
   return result.changes || 0;
+}
+
+export async function getVcRole(guild_id: string): Promise<IVcRole | null> {
+  const result = await db`SELECT * FROM vc_role WHERE guild_id = ${guild_id}`;
+  if (result.length === 0) return null;
+  return result[0] as IVcRole;
+}
+
+export async function setVcRole(guild_id: string, role_id: string): Promise<void> {
+  await ensureConfig(guild_id);
+  await db`
+    INSERT INTO vc_role (guild_id, role_id)
+    VALUES (${guild_id}, ${role_id})
+    ON CONFLICT(guild_id) DO UPDATE SET role_id = excluded.role_id;
+  `;
+}
+
+export async function removeVcRole(guild_id: string): Promise<void> {
+  await db`DELETE FROM vc_role WHERE guild_id = ${guild_id}`;
+}
+
+export async function removeVcRoleByRoleId(guild_id: string, role_id: string): Promise<void> {
+  await db`DELETE FROM vc_role WHERE guild_id = ${guild_id} AND role_id = ${role_id}`;
 }

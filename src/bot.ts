@@ -25,7 +25,7 @@ process.on('unhandledRejection', (reason, promise) => {
 const rest = new REST({ version: "10" }).setToken(token);
 const gateway = new WebSocketManager({
     token,
-    intents: GatewayIntentBits.Guilds | GatewayIntentBits.GuildMessages | GatewayIntentBits.MessageContent | GatewayIntentBits.GuildMembers,
+    intents: GatewayIntentBits.Guilds | GatewayIntentBits.GuildMessages | GatewayIntentBits.MessageContent | GatewayIntentBits.GuildMembers | GatewayIntentBits.GuildVoiceStates,
     fetchGatewayInformation: () => rest.get(Routes.gatewayBot()) as Promise<RESTGetAPIGatewayBotResult>,
     shardCount: null,
 });

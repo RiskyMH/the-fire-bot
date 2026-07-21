@@ -25,6 +25,7 @@ import forceNick from "./features/force-nick";
 import guildActions from "./features/guild-actions";
 import guildTagRole from "./features/guild-tag-role";
 import timezone from "./features/timezone";
+import vcRole from "./features/vc-role";
 import wave from "./features/wave";
 
 export const features = [
@@ -33,6 +34,7 @@ export const features = [
     guildActions,
     guildTagRole,
     timezone,
+    vcRole,
     wave,
 ]
 
