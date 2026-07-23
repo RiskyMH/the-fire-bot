@@ -53,25 +53,48 @@ const countingModule: EventModule = {
                 return;
             }
             if (num !== count + 1) {
+                const difficulty = counting.difficulty || "medium";
+
                 if (lastUser && last_msg?.failed && (message.author.id === lastUser)) {
                     // don't let them get away with 2 failes in a row - just ignore them
-                    await api.channels.addMessageReaction(message.channel_id, message.id, useCustomEmoji ? 'cross:1483351988199620648' : '❌');
+                    if (difficulty === "easy") {
+                        await api.channels.addMessageReaction(message.channel_id, message.id, useCustomEmoji ? 'warning:1483352438525399081' : '⚠️');
+                    } else {
+                        await api.channels.addMessageReaction(message.channel_id, message.id, useCustomEmoji ? 'cross:1483351988199620648' : '❌');
+                    }
                     return;
                 }
 
-                const punishmentNumber = Math.max(
-                    // dont let it go negative
-                    0,
-                    Math.min(
-                        Math.max(
-                            // do either how much they were off by or % based on the count (to not fully die)
-                            (count - Math.round(Math.abs(count - num) * ((Math.random() * 2) + 1.35))),
-                            Math.round(count * (1 - (count > 25 ? 0.15 : 0.5))),
-                        ),
-                        // always at least punish a little bit
-                        count - 1
-                    )
-                );
+                if (difficulty === "easy") {
+                    let nextMsg = { message_id: message.id, author_id: message.author.id, number: num, failed: true };
+                    await db.updateCounting(message.channel_id, { last_msg: nextMsg });
+                    await api.channels.createMessage(message.channel_id, {
+                        content: `⚠️ <@${message.author.id}> That's not right! The next number is **${(count + 1).toLocaleString()}**, try again!`,
+                        message_reference: { message_id: message.id }
+                    });
+                    await api.channels.addMessageReaction(message.channel_id, message.id, useCustomEmoji ? 'warning:1483352438525399081' : '⚠️');
+                    return;
+                }
+
+                let punishmentNumber: number;
+                if (difficulty === "hard") {
+                    punishmentNumber = 0;
+                } else {
+                    punishmentNumber = Math.max(
+                        // dont let it go negative
+                        0,
+                        Math.min(
+                            Math.max(
+                                // do either how much they were off by or % based on the count (to not fully die)
+                                (count - Math.round(Math.abs(count - num) * ((Math.random() * 2) + 1.35))),
+                                Math.round(count * (1 - (count > 25 ? 0.15 : 0.5))),
+                            ),
+                            // always at least punish a little bit
+                            count - 1
+                        )
+                    );
+                }
+
                 let nextMsg = { message_id: message.id, author_id: message.author.id, number: num, failed: true };
                 await db.updateCounting(message.channel_id, { count: punishmentNumber, last_msg: nextMsg });
                 await api.channels.createMessage(message.channel_id, {
@@ -187,9 +210,24 @@ const countingModule: EventModule = {
                                 placeholder: count?.highscore?.toLocaleString() || "0"
                             }
                         },
+                        {
+                            type: ComponentType.Label,
+                            label: "Difficulty",
+                            description: "How harsh is the punishment for getting a number wrong?",
+                            component: {
+                                type: ComponentType.RadioGroup,
+                                custom_id: "difficulty",
+                                options: [
+                                    { label: "Easy", value: "easy", description: "No punishment, just try again", default: count?.difficulty === "easy" },
+                                    { label: "Medium", value: "medium", description: "Punishment scales with the count", default: count?.difficulty === "medium" || !count?.difficulty },
+                                    { label: "Hard", value: "hard", description: "Always resets to 0", default: count?.difficulty === "hard" },
+                                ],
+                                required: true,
+                            },
+                        },
                         count && {
                             type: ComponentType.Label,
-                            label: "Disable Counting",
+                            label: "Delete Counting",
                             description: "If enabled, the bot will stop counting and reset the data.",
                             component: {
                                 type: ComponentType.Checkbox,
@@ -211,6 +249,7 @@ const countingModule: EventModule = {
                 let newCount = 0;
                 let newHighScore = 0;
                 let resetMessages = false;
+                let difficulty = "medium";
 
                 for (const label of interaction.data.components) {
                     if (label.type !== ComponentType.Label) continue;
@@ -221,6 +260,8 @@ const countingModule: EventModule = {
                         if (c.custom_id === "high_score" && c.value) newHighScore = parseInt(c.value.replaceAll(',', ''));
                     } else if (c.type === ComponentType.Checkbox) {
                         if (c.custom_id === "reset_messages") resetMessages = c.value;
+                    } else if (c.type === ComponentType.RadioGroup) {
+                        if (c.custom_id === "difficulty" && c.value) difficulty = c.value;
                     }
                 }
 
@@ -235,15 +276,15 @@ const countingModule: EventModule = {
                 if (resetMessages) {
                     await db.unsetCounting(channelId);
                     await api.interactions.reply(interaction.id, interaction.token, {
-                        content: `🚫 Counting has been disabled for this channel and all data has been reset.`,
+                        content: `🚫 Counting has been removed for this channel and all data has been reset.`,
                         flags: MessageFlags.Ephemeral
                     });
                     return;
                 }
 
-                await db.setCounting(channelId, interaction.guild_id, newCount, Math.max(newHighScore, newCount), undefined);
+                await db.setCounting(channelId, interaction.guild_id, newCount, Math.max(newHighScore, newCount), difficulty, undefined);
                 await api.interactions.reply(interaction.id, interaction.token, {
-                    content: `✅ Counting has been updated for this channel! The current count is now **${newCount.toLocaleString()}** with a high score of **${newHighScore.toLocaleString()}**.`,
+                    content: `✅ Counting has been updated for this channel! The current count is now **${newCount.toLocaleString()}** with a high score of **${newHighScore.toLocaleString()}** and difficulty set to **${difficulty}**.`,
                     allowed_mentions: {},
                 });
             }

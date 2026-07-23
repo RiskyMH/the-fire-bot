@@ -8,6 +8,7 @@ export type ICounting = {
   channel_id: string;
   count: number;
   highscore?: number;
+  difficulty?: "easy" | "medium" | "hard";
   last_msg?: { message_id: string, author_id: string, number: number, failed?: boolean } | null,
 };
 export type ITimezone = {
@@ -54,6 +55,7 @@ export async function initDb() {
       guild_id TEXT NOT NULL,
       count INTEGER NOT NULL DEFAULT 0,
       highscore INTEGER NOT NULL DEFAULT 0,
+      difficulty TEXT NOT NULL DEFAULT 'medium',
       last_msg TEXT DEFAULT '{}',
       FOREIGN KEY (guild_id) REFERENCES config(guild_id) ON DELETE CASCADE
     );
@@ -133,19 +135,21 @@ export async function getCounting(channel_id: string): Promise<ICounting | null>
     channel_id: row.channel_id,
     count: row.count,
     highscore: row.highscore,
+    difficulty: row.difficulty,
     last_msg: row.last_msg && row.last_msg !== '{}' ? JSON.parse(row.last_msg) : undefined,
   };
 }
 
-export async function setCounting(channel_id: string, guild_id: string, count = 0, highscore = 0, last_msg?: { message_id: string; author_id: string; number: number }): Promise<void> {
+export async function setCounting(channel_id: string, guild_id: string, count = 0, highscore = 0, difficulty: string = "medium", last_msg?: { message_id: string; author_id: string; number: number }): Promise<void> {
   await ensureConfig(guild_id);
   const lastMsgStr = last_msg ? JSON.stringify(last_msg) : '{}';
   await db`
-    INSERT INTO counting (channel_id, guild_id, count, highscore, last_msg)
-    VALUES (${channel_id}, ${guild_id}, ${count}, ${highscore}, ${lastMsgStr})
+    INSERT INTO counting (channel_id, guild_id, count, highscore, difficulty, last_msg)
+    VALUES (${channel_id}, ${guild_id}, ${count}, ${highscore}, ${difficulty}, ${lastMsgStr})
     ON CONFLICT(channel_id) DO UPDATE SET
       count = excluded.count,
       highscore = excluded.highscore,
+      difficulty = excluded.difficulty,
       last_msg = excluded.last_msg;
   `;
 }
