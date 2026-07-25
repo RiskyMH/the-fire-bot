@@ -12,16 +12,19 @@ const vcRoleModule: EventModule = {
             const guildId = voiceState.guild_id;
             if (!guildId) return;
 
+            // must have left server if no member object is present, so we can't do anything
+            if (!voiceState.member) return;
+
             const config = await db.getVcRole(guildId);
             if (!config) return;
 
             try {
                 if (voiceState.channel_id) {
-                    if (!voiceState.member?.roles.includes(config.role_id)) {
+                    if (!voiceState.member.roles.includes(config.role_id)) {
                         await api.guilds.addRoleToMember(guildId, voiceState.user_id, config.role_id, { reason: "user joined VC" });
                     }
                 } else {
-                    if (voiceState.member?.roles.includes(config.role_id)) {
+                    if (voiceState.member.roles.includes(config.role_id)) {
                         await api.guilds.removeRoleFromMember(guildId, voiceState.user_id, config.role_id, { reason: "user left VC" });
                     }
                 }
