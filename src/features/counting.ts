@@ -187,7 +187,7 @@ const countingModule: EventModule = {
                             component: {
                                 type: ComponentType.TextInput,
                                 custom_id: "current_count",
-                                max_length: Math.max(10, count?.count?.toString().length || 0),
+                                max_length: Math.max(10, count?.count?.toLocaleString().length || 0),
                                 min_length: 1,
                                 style: TextInputStyle.Short,
                                 required: !!count,
@@ -202,7 +202,7 @@ const countingModule: EventModule = {
                             component: {
                                 type: ComponentType.TextInput,
                                 custom_id: "high_score",
-                                max_length: Math.max(10, count?.highscore?.toString().length || 0),
+                                max_length: Math.max(10, count?.highscore?.toLocaleString().length || 0),
                                 min_length: 1,
                                 style: TextInputStyle.Short,
                                 required: false,
