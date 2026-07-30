@@ -122,7 +122,7 @@ const countingModule: EventModule = {
             const counting = await getCounting(channelId);
             if (!counting) return;
             let latest = counting.last_msg;
-            if (!latest || latest.message_id !== message.id) return;
+            if (!latest || latest.failed || latest.message_id !== message.id) return;
             const newNumber = Number.parseInt(message.content);
             if (isNaN(newNumber) || newNumber === latest.number) return;
             await api.channels.createMessage(channelId, {
@@ -134,7 +134,7 @@ const countingModule: EventModule = {
             const counting = await getCounting(channelId);
             if (!counting) return;
             let latest = counting.last_msg;
-            if (!latest || latest.message_id !== message.id) return;
+            if (!latest || latest.failed || latest.message_id !== message.id) return;
             await api.channels.createMessage(channelId, {
                 content: `<@${latest.author_id}> why u delete **"${latest.number.toLocaleString()}"**?`
             });
@@ -143,7 +143,7 @@ const countingModule: EventModule = {
             const counting = await getCounting(channel_id);
             if (!counting) return;
             let latest = counting.last_msg;
-            if (!latest || !ids.includes(latest.message_id)) return;
+            if (!latest || latest.failed || !ids.includes(latest.message_id)) return;
             await api.channels.createMessage(channel_id, {
                 content: `<@${latest.author_id}> why u delete **"${latest.number.toLocaleString()}"**?`
             });
