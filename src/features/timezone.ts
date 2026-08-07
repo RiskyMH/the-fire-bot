@@ -11,13 +11,19 @@ const timezoneModule: EventModule = {
     name: "timezone",
     handlers: {
         [GatewayDispatchEvents.Ready]: async ({ data, api, db, commandIds }) => {
+            const fn = async () => {
+                try {
+                    await updateExistingTimezoneMessage(api, db, commandIds);
+                } catch (err) {
+                    console.error(`Failed to update timezone message on cron: ${err}`);
+                }
+            };
+            await fn();
+
             const timeTillNextMinute = 60000 - (Date.now() % 60000);
-            await updateExistingTimezoneMessage(api, db, commandIds).catch(console.error);
             setTimeout(() => {
-                updateExistingTimezoneMessage(api, db, commandIds).catch(console.error);
-                setInterval(() => {
-                    updateExistingTimezoneMessage(api, db, commandIds).catch(console.error);
-                }, 60_000);
+                fn();
+                setInterval(fn, 60_000);
             }, timeTillNextMinute);
         },
         [GatewayDispatchEvents.MessageDelete]: async ({ data: message, api, db }) => {
@@ -333,11 +339,15 @@ async function updateExistingTimezoneMessage(api: API, db: typeof import("../db.
     const guilds = await db.getTimezoneMessages();
     for (const guild of guilds) {
         const newContent = await generateTimezoneMessage(db, guild.guild_id, null, commandIds);
-        if (!newContent) return;
-        await api.channels.editMessage(guild.channel_id, guild.message_id, {
-            ...newContent,
-            allowed_mentions: {},
-        }).catch(console.error);
+        if (!newContent) continue;
+        try {
+            await api.channels.editMessage(guild.channel_id, guild.message_id, {
+                ...newContent,
+                allowed_mentions: {},
+            });
+        } catch (err) {
+            console.error(`Failed to update timezone message: ${err}`);
+        }
     }
 }
 
