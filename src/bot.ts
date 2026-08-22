@@ -33,7 +33,7 @@ const gateway = new WebSocketManager({
 const client = new Client({ rest, gateway });
 
 client.on(GatewayDispatchEvents.GuildDelete, async ({ data: guild, api }) => {
-    if (!guild.id) return;
+    if (!guild.id || guild.unavailable) return;
     await db.removeGuild(guild.id);
 });
 
