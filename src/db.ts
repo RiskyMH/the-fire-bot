@@ -29,6 +29,20 @@ export type IVcRole = {
   guild_id: string;
   role_id: string;
 }
+export type ITempRoleButton = {
+  custom_id: string;
+  guild_id: string;
+  channel_id: string;
+  message_id: string;
+  role_id: string;
+  label: string;
+}
+export type ITempRoleClaim = {
+  custom_id: string;
+  guild_id: string;
+  user_id: string;
+  expires_at: number;
+}
 
 export const db = new SQL(process.env.DATABASE_URL || "sqlite://db.sqlite");
 
@@ -101,6 +115,26 @@ export async function initDb() {
       role_id TEXT NOT NULL,
       FOREIGN KEY (guild_id) REFERENCES config(guild_id) ON DELETE CASCADE
     );
+
+    CREATE TABLE IF NOT EXISTS temp_role_button (
+      custom_id TEXT PRIMARY KEY,
+      guild_id TEXT NOT NULL,
+      channel_id TEXT NOT NULL,
+      message_id TEXT NOT NULL UNIQUE,
+      role_id TEXT NOT NULL,
+      label TEXT NOT NULL,
+      FOREIGN KEY (guild_id) REFERENCES config(guild_id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS temp_role_claim (
+      custom_id TEXT NOT NULL,
+      guild_id TEXT NOT NULL,
+      user_id TEXT NOT NULL,
+      expires_at INTEGER NOT NULL DEFAULT 0,
+      PRIMARY KEY (custom_id, user_id),
+      FOREIGN KEY (custom_id) REFERENCES temp_role_button(custom_id) ON DELETE CASCADE,
+      FOREIGN KEY (guild_id) REFERENCES config(guild_id) ON DELETE CASCADE
+    );
   `;
 }
 
@@ -113,6 +147,8 @@ export async function removeGuild(guild_id: string): Promise<void> {
   await db`DELETE FROM guild_tag WHERE guild_id = ${guild_id}`;
   await db`DELETE FROM force_nick WHERE guild_id = ${guild_id}`;
   await db`DELETE FROM vc_role WHERE guild_id = ${guild_id}`;
+  await db`DELETE FROM temp_role_claim WHERE guild_id = ${guild_id}`;
+  await db`DELETE FROM temp_role_button WHERE guild_id = ${guild_id}`;
 }
 
 export async function ensureConfig(guild_id: string): Promise<void> {
@@ -361,4 +397,85 @@ export async function removeVcRole(guild_id: string): Promise<void> {
 
 export async function removeVcRoleByRoleId(guild_id: string, role_id: string): Promise<void> {
   await db`DELETE FROM vc_role WHERE guild_id = ${guild_id} AND role_id = ${role_id}`;
+}
+
+export async function createTempRoleButton(button: ITempRoleButton): Promise<void> {
+  await ensureConfig(button.guild_id);
+  await db`
+    INSERT INTO temp_role_button (custom_id, guild_id, channel_id, message_id, role_id, label)
+    VALUES (${button.custom_id}, ${button.guild_id}, ${button.channel_id}, ${button.message_id}, ${button.role_id}, ${button.label})
+  `;
+}
+
+export async function getTempRoleButtonByCustomId(custom_id: string): Promise<ITempRoleButton | null> {
+  const result = await db`SELECT * FROM temp_role_button WHERE custom_id = ${custom_id}`;
+  if (result.length === 0) return null;
+  return result[0] as ITempRoleButton;
+}
+
+export async function getTempRoleButtonByMessageId(message_id: string): Promise<ITempRoleButton | null> {
+  const result = await db`SELECT * FROM temp_role_button WHERE message_id = ${message_id}`;
+  if (result.length === 0) return null;
+  return result[0] as ITempRoleButton;
+}
+
+export async function getTempRoleButtonsByChannel(channel_id: string): Promise<ITempRoleButton[]> {
+  const result = await db`SELECT * FROM temp_role_button WHERE channel_id = ${channel_id}`;
+  return Array.isArray(result) ? (result as ITempRoleButton[]) : [];
+}
+
+export async function deleteTempRoleButtonByCustomId(custom_id: string): Promise<void> {
+  await db`DELETE FROM temp_role_claim WHERE custom_id = ${custom_id}`;
+  await db`DELETE FROM temp_role_button WHERE custom_id = ${custom_id}`;
+}
+
+export async function deleteTempRoleButtonByMessageId(message_id: string): Promise<void> {
+  const button = await getTempRoleButtonByMessageId(message_id);
+  if (button) await deleteTempRoleButtonByCustomId(button.custom_id);
+}
+
+export async function deleteTempRoleButtonsByChannel(channel_id: string): Promise<void> {
+  const buttons = await getTempRoleButtonsByChannel(channel_id);
+  for (const button of buttons) {
+    await deleteTempRoleButtonByCustomId(button.custom_id);
+  }
+}
+
+export async function deleteTempRoleButtonsByRole(guild_id: string, role_id: string): Promise<void> {
+  const result = await db`SELECT custom_id FROM temp_role_button WHERE guild_id = ${guild_id} AND role_id = ${role_id}`;
+  for (const row of result as { custom_id: string }[]) {
+    await deleteTempRoleButtonByCustomId(row.custom_id);
+  }
+}
+
+export async function addTempRoleClaim(custom_id: string, guild_id: string, user_id: string, expires_at: number): Promise<void> {
+  await db`
+    INSERT INTO temp_role_claim (custom_id, guild_id, user_id, expires_at)
+    VALUES (${custom_id}, ${guild_id}, ${user_id}, ${expires_at})
+    ON CONFLICT(custom_id, user_id) DO UPDATE SET expires_at = excluded.expires_at
+  `;
+}
+
+export async function removeTempRoleClaim(custom_id: string, user_id: string): Promise<void> {
+  await db`DELETE FROM temp_role_claim WHERE custom_id = ${custom_id} AND user_id = ${user_id}`;
+}
+
+export async function getTempRoleClaim(custom_id: string, user_id: string): Promise<ITempRoleClaim | null> {
+  const result = await db`SELECT * FROM temp_role_claim WHERE custom_id = ${custom_id} AND user_id = ${user_id}`;
+  if (result.length === 0) return null;
+  return result[0] as ITempRoleClaim;
+}
+
+export async function getTempRoleClaims(custom_id: string): Promise<ITempRoleClaim[]> {
+  const result = await db`SELECT * FROM temp_role_claim WHERE custom_id = ${custom_id}`;
+  return Array.isArray(result) ? (result as ITempRoleClaim[]) : [];
+}
+
+export async function getExpiredTempRoleClaims(now: number): Promise<ITempRoleClaim[]> {
+  const result = await db`SELECT * FROM temp_role_claim WHERE expires_at > 0 AND expires_at <= ${now}`;
+  return Array.isArray(result) ? (result as ITempRoleClaim[]) : [];
+}
+
+export async function removeTempRoleClaimsOfUser(guild_id: string, user_id: string): Promise<void> {
+  await db`DELETE FROM temp_role_claim WHERE guild_id = ${guild_id} AND user_id = ${user_id}`;
 }

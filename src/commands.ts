@@ -119,4 +119,35 @@ export const commands = [
         integration_types: [ApplicationIntegrationType.GuildInstall],
         contexts: [InteractionContextType.Guild],
     },
+    {
+        name: "temp-role-button",
+        description: "Post a button that gives users a role for 1 hour (removed if message deleted)",
+        type: ApplicationCommandType.ChatInput,
+        options: [
+            {
+                type: ApplicationCommandOptionType.Role,
+                name: "role",
+                description: "The role to give when users click the button",
+                required: true,
+            },
+            {
+                type: ApplicationCommandOptionType.String,
+                name: "label",
+                description: "The text shown on the button",
+                required: true,
+                min_length: 1,
+                max_length: 80,
+            },
+            {
+                type: ApplicationCommandOptionType.String,
+                name: "message",
+                description: "Optional text shown above the button",
+                required: false,
+                max_length: 2000,
+            },
+        ],
+        default_member_permissions: PermissionFlagsBits.ManageRoles.toString(),
+        integration_types: [ApplicationIntegrationType.GuildInstall],
+        contexts: [InteractionContextType.Guild],
+    },
 ] satisfies RESTPutAPIApplicationCommandsJSONBody;
