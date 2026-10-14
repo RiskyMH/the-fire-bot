@@ -151,6 +151,15 @@ export const commands = [
         contexts: [InteractionContextType.Guild],
     },
     {
+        name: "wave",
+        description: "Configure auto-wave reactions for hi messages and join messages",
+        type: ApplicationCommandType.ChatInput,
+        options: [],
+        default_member_permissions: (PermissionFlagsBits.ManageGuild | PermissionFlagsBits.AddReactions).toString(),
+        integration_types: [ApplicationIntegrationType.GuildInstall],
+        contexts: [InteractionContextType.Guild],
+    },
+    {
         name: "new-member-timeout",
         description: "Timeout new members whose accounts are younger than a threshold",
         type: ApplicationCommandType.ChatInput,

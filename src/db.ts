@@ -142,6 +142,13 @@ export async function initDb() {
       timeout_secs INTEGER NOT NULL,
       FOREIGN KEY (guild_id) REFERENCES config(guild_id) ON DELETE CASCADE
     );
+
+    CREATE TABLE IF NOT EXISTS wave_config (
+      guild_id TEXT PRIMARY KEY,
+      react_hi INTEGER NOT NULL DEFAULT 0,
+      react_join INTEGER NOT NULL DEFAULT 0,
+      FOREIGN KEY (guild_id) REFERENCES config(guild_id) ON DELETE CASCADE
+    );
   `;
 }
 
@@ -157,6 +164,7 @@ export async function removeGuild(guild_id: string): Promise<void> {
   await db`DELETE FROM temp_role_claim WHERE guild_id = ${guild_id}`;
   await db`DELETE FROM temp_role_button WHERE guild_id = ${guild_id}`;
   await db`DELETE FROM new_member_timeout WHERE guild_id = ${guild_id}`;
+  await db`DELETE FROM wave_config WHERE guild_id = ${guild_id}`;
 }
 
 export async function ensureConfig(guild_id: string): Promise<void> {
@@ -513,4 +521,31 @@ export async function setNewMemberTimeout(guild_id: string, min_account_age_secs
 
 export async function removeNewMemberTimeout(guild_id: string): Promise<void> {
   await db`DELETE FROM new_member_timeout WHERE guild_id = ${guild_id}`;
+}
+
+export type IWaveConfig = {
+  guild_id: string;
+  react_hi: number;
+  react_join: number;
+}
+
+export async function getWaveConfig(guild_id: string): Promise<IWaveConfig | null> {
+  const result = await db`SELECT * FROM wave_config WHERE guild_id = ${guild_id}`;
+  if (result.length === 0) return null;
+  return result[0] as IWaveConfig;
+}
+
+export async function setWaveConfig(guild_id: string, react_hi: boolean, react_join: boolean): Promise<void> {
+  await ensureConfig(guild_id);
+  await db`
+    INSERT INTO wave_config (guild_id, react_hi, react_join)
+    VALUES (${guild_id}, ${react_hi ? 1 : 0}, ${react_join ? 1 : 0})
+    ON CONFLICT(guild_id) DO UPDATE SET
+      react_hi = excluded.react_hi,
+      react_join = excluded.react_join;
+  `;
+}
+
+export async function removeWaveConfig(guild_id: string): Promise<void> {
+  await db`DELETE FROM wave_config WHERE guild_id = ${guild_id}`;
 }
