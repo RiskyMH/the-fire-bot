@@ -150,4 +150,13 @@ export const commands = [
         integration_types: [ApplicationIntegrationType.GuildInstall],
         contexts: [InteractionContextType.Guild],
     },
+    {
+        name: "new-member-timeout",
+        description: "Timeout new members whose accounts are younger than a threshold",
+        type: ApplicationCommandType.ChatInput,
+        options: [],
+        default_member_permissions: (PermissionFlagsBits.ModerateMembers | PermissionFlagsBits.ManageGuild).toString(),
+        integration_types: [ApplicationIntegrationType.GuildInstall],
+        contexts: [InteractionContextType.Guild],
+    },
 ] satisfies RESTPutAPIApplicationCommandsJSONBody;

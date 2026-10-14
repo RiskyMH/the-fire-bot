@@ -24,6 +24,7 @@ import counting from "./features/counting";
 import forceNick from "./features/force-nick";
 import guildActions from "./features/guild-actions";
 import guildTagRole from "./features/guild-tag-role";
+import newMemberTimeout from "./features/new-member-timeout";
 import tempRole from "./features/temp-role";
 import timezone from "./features/timezone";
 import vcRole from "./features/vc-role";
@@ -34,6 +35,7 @@ export const features = [
     forceNick,
     guildActions,
     guildTagRole,
+    newMemberTimeout,
     tempRole,
     timezone,
     vcRole,

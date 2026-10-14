@@ -135,6 +135,13 @@ export async function initDb() {
       FOREIGN KEY (custom_id) REFERENCES temp_role_button(custom_id) ON DELETE CASCADE,
       FOREIGN KEY (guild_id) REFERENCES config(guild_id) ON DELETE CASCADE
     );
+
+    CREATE TABLE IF NOT EXISTS new_member_timeout (
+      guild_id TEXT PRIMARY KEY,
+      min_account_age_secs INTEGER NOT NULL,
+      timeout_secs INTEGER NOT NULL,
+      FOREIGN KEY (guild_id) REFERENCES config(guild_id) ON DELETE CASCADE
+    );
   `;
 }
 
@@ -149,6 +156,7 @@ export async function removeGuild(guild_id: string): Promise<void> {
   await db`DELETE FROM vc_role WHERE guild_id = ${guild_id}`;
   await db`DELETE FROM temp_role_claim WHERE guild_id = ${guild_id}`;
   await db`DELETE FROM temp_role_button WHERE guild_id = ${guild_id}`;
+  await db`DELETE FROM new_member_timeout WHERE guild_id = ${guild_id}`;
 }
 
 export async function ensureConfig(guild_id: string): Promise<void> {
@@ -478,4 +486,31 @@ export async function getExpiredTempRoleClaims(now: number): Promise<ITempRoleCl
 
 export async function removeTempRoleClaimsOfUser(guild_id: string, user_id: string): Promise<void> {
   await db`DELETE FROM temp_role_claim WHERE guild_id = ${guild_id} AND user_id = ${user_id}`;
+}
+
+export type INewMemberTimeout = {
+  guild_id: string;
+  min_account_age_secs: number;
+  timeout_secs: number;
+}
+
+export async function getNewMemberTimeout(guild_id: string): Promise<INewMemberTimeout | null> {
+  const result = await db`SELECT * FROM new_member_timeout WHERE guild_id = ${guild_id}`;
+  if (result.length === 0) return null;
+  return result[0] as INewMemberTimeout;
+}
+
+export async function setNewMemberTimeout(guild_id: string, min_account_age_secs: number, timeout_secs: number): Promise<void> {
+  await ensureConfig(guild_id);
+  await db`
+    INSERT INTO new_member_timeout (guild_id, min_account_age_secs, timeout_secs)
+    VALUES (${guild_id}, ${min_account_age_secs}, ${timeout_secs})
+    ON CONFLICT(guild_id) DO UPDATE SET
+      min_account_age_secs = excluded.min_account_age_secs,
+      timeout_secs = excluded.timeout_secs;
+  `;
+}
+
+export async function removeNewMemberTimeout(guild_id: string): Promise<void> {
+  await db`DELETE FROM new_member_timeout WHERE guild_id = ${guild_id}`;
 }
